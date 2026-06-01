@@ -206,7 +206,7 @@ export function OnboardingClient() {
                   }`}
                   onClick={() => updateDraft({ lossTolerance: option })}
                 >
-                  {formatPercent(option, 0)}
+                  {option === -0.3 ? "-30% 이상" : formatPercent(option, 0)}
                 </button>
               ))}
             </div>
