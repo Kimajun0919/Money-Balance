@@ -12,6 +12,7 @@ import {
   LineChart,
   ListChecks,
   PieChart,
+  Plug,
   Settings,
   Upload,
   WalletCards
@@ -30,7 +31,11 @@ const navItems = [
   { href: "/trends", label: "추이", icon: LineChart },
   { href: "/notifications", label: "알림", icon: Bell },
   { href: "/settings/notifications", label: "알림 설정", icon: Settings },
-  { href: "/import/csv", label: "CSV", icon: Upload }
+  { href: "/settings/data-sources", label: "데이터", icon: Settings },
+  { href: "/import/assets", label: "가져오기", icon: Upload },
+  { href: "/import/history", label: "가져오기 이력", icon: History },
+  { href: "/connections/broker", label: "증권사", icon: Plug },
+  { href: "/connections/logs", label: "연동 로그", icon: History }
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {

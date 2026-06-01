@@ -185,6 +185,28 @@ export function AssetsClient() {
 
         <div className="mt-5 grid gap-5 lg:grid-cols-4">
           <label className="block">
+            <span className="text-sm font-medium text-neutral-700">종목코드</span>
+            <input
+              className="mt-2 h-11 w-full rounded-md border border-line px-3 uppercase"
+              value={form.ticker ?? ""}
+              onChange={(event) =>
+                updateForm({ ticker: event.target.value.toUpperCase() })
+              }
+              placeholder="예: SPY"
+            />
+          </label>
+          <label className="block">
+            <span className="text-sm font-medium text-neutral-700">거래시장</span>
+            <input
+              className="mt-2 h-11 w-full rounded-md border border-line px-3 uppercase"
+              value={form.market ?? ""}
+              onChange={(event) =>
+                updateForm({ market: event.target.value.toUpperCase() })
+              }
+              placeholder="예: NYSE"
+            />
+          </label>
+          <label className="block">
             <span className="text-sm font-medium text-neutral-700">통화</span>
             <input
               className="mt-2 h-11 w-full rounded-md border border-line px-3 uppercase"
@@ -219,7 +241,7 @@ export function AssetsClient() {
               }
             />
           </label>
-          <div className="rounded-md border border-line bg-neutral-50 p-3">
+          <div className="rounded-md border border-line bg-neutral-50 p-3 lg:col-span-4">
             <p className="text-sm text-neutral-500">원화 환산 평가금액</p>
             <p className="mt-2 text-lg font-bold text-ink">
               {formatKrw(
@@ -363,11 +385,12 @@ export function AssetsClient() {
           <span className="text-sm text-neutral-500">{state.assets.length}개</span>
         </div>
         <div className="table-scroll mt-4 overflow-x-auto">
-          <table className="w-full min-w-[860px] border-collapse text-sm">
+            <table className="w-full min-w-[980px] border-collapse text-sm">
             <thead>
               <tr className="border-b border-line text-left text-neutral-500">
                 <th className="py-3 pr-3">자산 이름</th>
                 <th className="py-3 pr-3">자산군</th>
+                <th className="py-3 pr-3">종목코드</th>
                 <th className="py-3 pr-3 text-right">원화 평가금액</th>
                 <th className="py-3 pr-3 text-right">기대수익률</th>
                 <th className="py-3 pr-3 text-right">인컴수익률</th>
@@ -381,6 +404,9 @@ export function AssetsClient() {
                   <td className="py-3 pr-3 font-medium">{asset.assetName}</td>
                   <td className="py-3 pr-3">
                     {ASSET_TYPE_SETTINGS[asset.assetType].label}
+                  </td>
+                  <td className="py-3 pr-3">
+                    {asset.ticker ? `${asset.ticker} · ${asset.market}` : "-"}
                   </td>
                   <td className="py-3 pr-3 text-right">
                     {formatKrw(asset.valuationAmountKrw)}
@@ -408,7 +434,7 @@ export function AssetsClient() {
               ))}
               {state.assets.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-8 text-center text-neutral-500">
+                  <td colSpan={8} className="py-8 text-center text-neutral-500">
                     등록된 자산이 없습니다.
                   </td>
                 </tr>

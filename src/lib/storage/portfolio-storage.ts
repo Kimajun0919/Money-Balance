@@ -30,7 +30,16 @@ function normalizeState(parsed: Partial<AppState>): AppState {
     notifications: parsed.notifications ?? defaults.notifications,
     emailLogs: parsed.emailLogs ?? defaults.emailLogs,
     csvImportJobs: parsed.csvImportJobs ?? defaults.csvImportJobs,
-    csvImportRows: parsed.csvImportRows ?? defaults.csvImportRows
+    csvImportRows: parsed.csvImportRows ?? defaults.csvImportRows,
+    marketPriceSnapshots:
+      parsed.marketPriceSnapshots ?? defaults.marketPriceSnapshots,
+    fxRateSnapshots: parsed.fxRateSnapshots ?? defaults.fxRateSnapshots,
+    assetPriceLinks: parsed.assetPriceLinks ?? defaults.assetPriceLinks,
+    externalAssetMappings:
+      parsed.externalAssetMappings ?? defaults.externalAssetMappings,
+    externalConnections:
+      parsed.externalConnections ?? defaults.externalConnections,
+    externalSyncLogs: parsed.externalSyncLogs ?? defaults.externalSyncLogs
   };
 }
 

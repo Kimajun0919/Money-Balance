@@ -65,6 +65,7 @@ enum SnapshotSource {
   manual
   reminder_based
   imported
+  broker_sync
   system_generated
 }
 
@@ -105,6 +106,7 @@ enum EmailStatus {
 enum CsvImportStatus {
   uploaded
   parsed
+  mapped
   validated
   imported
   failed
@@ -115,6 +117,65 @@ enum CsvRowValidationStatus {
   valid
   warning
   invalid
+}
+
+enum CsvImportType {
+  standard
+  generic
+  broker_specific
+}
+
+enum DuplicateAssetStatus {
+  none
+  possible
+  confirmed
+}
+
+enum ValuationSource {
+  manual
+  csv_import
+  broker_sync
+  market_price
+  mixed
+}
+
+enum ExternalProviderType {
+  market_data
+  fx_rate
+  broker
+}
+
+enum ExternalConnectionStatus {
+  connected
+  disconnected
+  failed
+  deleted
+}
+
+enum ExternalSyncStatus {
+  started
+  previewed
+  applied
+  success
+  partial_success
+  failed
+}
+
+enum ExternalSyncType {
+  market_price
+  fx_rate
+  csv_import
+  broker_connection
+  broker_holdings
+  broker_cash
+  broker_delete
+}
+
+enum MappingSource {
+  auto
+  user
+  system_default
+  broker_metadata
 }
 
 model User {
@@ -139,6 +200,9 @@ model User {
   email_logs           EmailLog[]
   notification_settings UserNotificationSetting?
   csv_import_jobs      CsvImportJob[]
+  external_connections ExternalConnection[]
+  external_sync_logs   ExternalSyncLog[]
+  external_asset_mappings ExternalAssetMapping[]
 
   @@map("users")
 }
@@ -149,6 +213,12 @@ model Asset {
   user                         User                   @relation(fields: [user_id], references: [id], onDelete: Cascade)
   asset_name                   String
   asset_type                   AssetType
+  ticker                       String?
+  market                       String?
+  broker_name                  String?
+  account_alias                String?
+  external_connection_id       String?
+  external_asset_id            String?
   valuation_amount             Decimal                @db.Decimal(18, 2)
   currency                     String                 @default("KRW")
   exchange_rate                Decimal                @db.Decimal(18, 6) @default(1)
@@ -173,11 +243,21 @@ model Asset {
   risk_coefficient             Decimal                @db.Decimal(8, 6)
   liquidity_level              String
   liquidity_score              Int
+  valuation_source             ValuationSource        @default(manual)
+  price_source                 String?
+  fx_source                    String?
+  last_synced_at               DateTime?
+  last_price_updated_at        DateTime?
+  last_fx_updated_at           DateTime?
+  is_auto_imported             Boolean                @default(false)
+  user_confirmed_asset_type    Boolean                @default(false)
   created_at                   DateTime               @default(now())
   updated_at                   DateTime               @updatedAt
 
   @@index([user_id])
   @@index([asset_type])
+  @@index([ticker, market])
+  @@index([external_connection_id])
   @@map("assets")
 }
 
@@ -386,10 +466,13 @@ model CsvImportJob {
   user_id             String
   user                User            @relation(fields: [user_id], references: [id], onDelete: Cascade)
   filename            String
+  import_type         CsvImportType   @default(standard)
+  broker_name         String?
   total_rows          Int
   valid_rows          Int
   invalid_rows        Int
   warning_rows        Int
+  duplicate_rows      Int             @default(0)
   status              CsvImportStatus @default(uploaded)
   error_summary       String?
   created_snapshot_id String?
@@ -408,14 +491,142 @@ model CsvImportRow {
   row_number        Int
   raw_data          Json
   parsed_data       Json?
+  mapped_data       Json?
   validation_status CsvRowValidationStatus
   errors            Json
   warnings          Json
+  duplicate_status  DuplicateAssetStatus @default(none)
+  duplicate_asset_id String?
   created_asset_id  String?
   created_at        DateTime               @default(now())
 
   @@index([import_job_id, validation_status])
   @@map("csv_import_rows")
+}
+
+model MarketPriceSnapshot {
+  id            String   @id @default(cuid())
+  ticker        String
+  market        String
+  currency      String
+  price         Decimal  @db.Decimal(18, 6)
+  price_date    DateTime
+  source        String
+  fetched_at    DateTime
+  is_delayed    Boolean  @default(true)
+  delay_minutes Int      @default(0)
+  raw_data      Json?
+  created_at    DateTime @default(now())
+
+  @@index([ticker, market, fetched_at])
+  @@map("market_price_snapshots")
+}
+
+model FxRateSnapshot {
+  id             String   @id @default(cuid())
+  base_currency  String
+  quote_currency String
+  rate           Decimal  @db.Decimal(18, 6)
+  rate_date      DateTime
+  source         String
+  fetched_at     DateTime
+  is_estimated   Boolean  @default(false)
+  raw_data       Json?
+  created_at     DateTime @default(now())
+
+  @@index([base_currency, quote_currency, fetched_at])
+  @@map("fx_rate_snapshots")
+}
+
+model AssetPriceLink {
+  id                    String   @id @default(cuid())
+  asset_id              String
+  ticker                String
+  market                String
+  price_source          String
+  fx_source             String?
+  auto_price_enabled    Boolean  @default(true)
+  auto_fx_enabled       Boolean  @default(true)
+  last_price_updated_at DateTime?
+  last_fx_updated_at    DateTime?
+  created_at            DateTime @default(now())
+  updated_at            DateTime @updatedAt
+
+  @@index([asset_id])
+  @@index([ticker, market])
+  @@map("asset_price_links")
+}
+
+model ExternalConnection {
+  id                         String                   @id @default(cuid())
+  user_id                    String
+  user                       User                     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  provider_type              ExternalProviderType
+  provider_name              String
+  broker_name                String?
+  account_alias              String?
+  account_identifier_masked  String?
+  encrypted_access_token     String?
+  encrypted_refresh_token    String?
+  token_preview              String?
+  scopes                     Json
+  status                     ExternalConnectionStatus @default(connected)
+  consent_accepted_at        DateTime?
+  last_synced_at             DateTime?
+  last_error                 String?
+  created_at                 DateTime                 @default(now())
+  updated_at                 DateTime                 @updatedAt
+  sync_logs                  ExternalSyncLog[]
+
+  @@index([user_id, provider_type, status])
+  @@map("external_connections")
+}
+
+model ExternalSyncLog {
+  id            String               @id @default(cuid())
+  user_id       String
+  user          User                 @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  connection_id String?
+  connection    ExternalConnection?  @relation(fields: [connection_id], references: [id], onDelete: SetNull)
+  provider_type ExternalProviderType
+  provider_name String
+  sync_type     ExternalSyncType
+  status        ExternalSyncStatus
+  started_at    DateTime
+  completed_at  DateTime?
+  total_items   Int                  @default(0)
+  success_items Int                  @default(0)
+  failed_items  Int                  @default(0)
+  warning_items Int                  @default(0)
+  error_message String?
+  snapshot_id   String?
+  raw_summary   Json?
+
+  @@index([user_id, sync_type, status])
+  @@index([connection_id])
+  @@map("external_sync_logs")
+}
+
+model ExternalAssetMapping {
+  id                 String        @id @default(cuid())
+  user_id            String
+  user               User          @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  provider           String
+  external_asset_id  String
+  asset_name         String
+  ticker             String?
+  market             String?
+  currency           String
+  raw_asset_type     String?
+  mapped_asset_type  AssetType
+  confidence_score   Decimal       @db.Decimal(8, 6)
+  mapping_source     MappingSource
+  user_confirmed     Boolean       @default(false)
+  created_at         DateTime      @default(now())
+  updated_at         DateTime      @updatedAt
+
+  @@unique([user_id, provider, external_asset_id])
+  @@map("external_asset_mappings")
 }
 
 model AssetTypeSetting {

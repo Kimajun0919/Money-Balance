@@ -4,6 +4,8 @@ import type {
   AssetType,
   CsvImportJob,
   CsvImportRow,
+  CsvImportType,
+  DuplicateAssetPolicy,
   PriceChangePeriodType
 } from "@/lib/types";
 import { createMonthlySnapshot } from "@/lib/services/snapshot-service";
@@ -14,6 +16,13 @@ import type { AssetInput } from "@/lib/validators/asset-validator";
 import { validateAssetInput } from "@/lib/validators/asset-validator";
 import { ASSET_TYPE_ORDER } from "@/lib/constants/asset-types";
 import { logKpiEvent } from "@/lib/kpi/event-logger";
+import { classifyAsset } from "@/lib/services/asset-classification-service";
+import {
+  applyCsvColumnMapping,
+  type CsvColumnMapping,
+  parseGenericCsv
+} from "@/lib/parsers/csv/generic-csv-parser";
+import { STANDARD_YIELD_BALANCE_COLUMNS } from "@/lib/parsers/csv/standard-yield-balance-parser";
 
 const ACCOUNT_TYPES = ["general", "isa", "pension", "irp", "tax_free", "unknown"];
 const PRICE_PERIOD_TYPES: PriceChangePeriodType[] = [
@@ -25,74 +34,16 @@ const PRICE_PERIOD_TYPES: PriceChangePeriodType[] = [
   "custom"
 ];
 
-export const CSV_TEMPLATE_HEADERS = [
-  "asset_name",
-  "asset_type",
-  "valuation_amount",
-  "currency",
-  "exchange_rate",
-  "account_type",
-  "income_yield",
-  "expected_capital_return",
-  "price_change_rate",
-  "price_change_period_type",
-  "fx_change_rate",
-  "income_tax_rate",
-  "capital_gain_tax_rate",
-  "purchase_date",
-  "purchase_amount"
-];
+export const CSV_TEMPLATE_HEADERS = STANDARD_YIELD_BALANCE_COLUMNS;
 
 export function getCsvTemplate() {
-  return `${CSV_TEMPLATE_HEADERS.join(",")}\n현금성 계좌,cash,1000000,KRW,1,general,2.8,0,0,1y,0,15.4,15.4,,`;
-}
-
-function parseCsvLine(line: string) {
-  const cells: string[] = [];
-  let current = "";
-  let inQuotes = false;
-
-  for (let index = 0; index < line.length; index += 1) {
-    const char = line[index];
-    const next = line[index + 1];
-    if (char === '"' && next === '"') {
-      current += '"';
-      index += 1;
-      continue;
-    }
-    if (char === '"') {
-      inQuotes = !inQuotes;
-      continue;
-    }
-    if (char === "," && !inQuotes) {
-      cells.push(current.trim());
-      current = "";
-      continue;
-    }
-    current += char;
-  }
-  cells.push(current.trim());
-  return cells;
+  return `${CSV_TEMPLATE_HEADERS.join(
+    ","
+  )}\n현금성 계좌,cash,,KRX,1000000,KRW,1,,,,,2.8,0,0,1y,,,0,15.4,15.4,general,모의증권,생활자금`;
 }
 
 export function parseCsv(csvText: string) {
-  const lines = csvText
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean);
-  if (lines.length === 0) return [];
-  const headers = parseCsvLine(lines[0]);
-
-  return lines.slice(1).map((line, index) => {
-    const values = parseCsvLine(line);
-    return {
-      rowNumber: index + 2,
-      rawData: headers.reduce<Record<string, string>>((acc, header, valueIndex) => {
-        acc[header] = values[valueIndex] ?? "";
-        return acc;
-      }, {})
-    };
-  });
+  return parseGenericCsv(csvText);
 }
 
 function numberFromCsv(value: string | undefined, fallback = 0) {
@@ -102,9 +53,21 @@ function numberFromCsv(value: string | undefined, fallback = 0) {
 }
 
 function parseCsvRowToAssetInput(
-  rawData: Record<string, string>
+  rawData: Record<string, string>,
+  confirmedAssetType?: AssetType
 ): AssetInput | null {
-  const assetType = rawData.asset_type as AssetType;
+  const classification = classifyAsset({
+    assetName: rawData.asset_name ?? "",
+    ticker: rawData.ticker,
+    market: rawData.market,
+    brokerProductType: rawData.broker_product_type,
+    rawAssetType: rawData.raw_asset_type,
+    currency: rawData.currency,
+    userSelectedAssetType: confirmedAssetType
+  });
+  const assetType = (confirmedAssetType ??
+    rawData.asset_type ??
+    classification.suggestedAssetType) as AssetType;
   if (!ASSET_TYPE_ORDER.includes(assetType)) return null;
   const currency = (rawData.currency || "KRW").toUpperCase();
   const priceChangeRate = fromPercentValue(
@@ -114,6 +77,10 @@ function parseCsvRowToAssetInput(
   return {
     assetName: rawData.asset_name ?? "",
     assetType,
+    ticker: rawData.ticker || undefined,
+    market: rawData.market || undefined,
+    brokerName: rawData.broker_name || undefined,
+    accountAlias: rawData.account_alias || undefined,
     valuationAmount: numberFromCsv(rawData.valuation_amount),
     currency,
     exchangeRate:
@@ -143,27 +110,51 @@ function parseCsvRowToAssetInput(
     purchaseDate: rawData.purchase_date || undefined,
     purchaseAmount: rawData.purchase_amount
       ? numberFromCsv(rawData.purchase_amount)
-      : undefined
+      : undefined,
+    purchaseUnitPrice: rawData.purchase_unit_price
+      ? numberFromCsv(rawData.purchase_unit_price)
+      : undefined,
+    quantity: rawData.quantity ? numberFromCsv(rawData.quantity) : undefined,
+    valuationSource: "csv_import",
+    isAutoImported: true,
+    userConfirmedAssetType: Boolean(confirmedAssetType)
   };
 }
 
 export function detectDuplicateAsset(assets: Asset[], input: AssetInput) {
   return assets.find(
-    (asset) =>
-      asset.assetName === input.assetName &&
+    (asset) => {
+      const sameIdentity =
+        (asset.ticker && input.ticker && asset.ticker === input.ticker) ||
+        asset.assetName === input.assetName;
+      return (
+        sameIdentity &&
       asset.assetType === input.assetType &&
       asset.accountType === input.accountType &&
+      (asset.brokerName ?? "") === (input.brokerName ?? "") &&
+      (asset.accountAlias ?? "") === (input.accountAlias ?? "") &&
       (asset.purchaseDate ?? "") === (input.purchaseDate ?? "") &&
       (asset.purchaseAmount ?? 0) === (input.purchaseAmount ?? 0)
+      );
+    }
   );
 }
 
 export function previewCsvImport(
   state: AppState,
-  params: { filename: string; csvText: string }
+  params: {
+    filename: string;
+    csvText: string;
+    importType?: CsvImportType;
+    brokerName?: string;
+    columnMapping?: CsvColumnMapping;
+  }
 ): { state: AppState; job: CsvImportJob; rows: CsvImportRow[] } {
   logKpiEvent("csv_import_started", { filename: params.filename });
-  const parsedRows = parseCsv(params.csvText);
+  const parsedRows = parseCsv(params.csvText).map((row) => ({
+    ...row,
+    rawData: applyCsvColumnMapping(row.rawData, params.columnMapping)
+  }));
   const now = new Date().toISOString();
   const jobId = createId("csv");
   const rows: CsvImportRow[] = parsedRows.map((row) => {
@@ -171,6 +162,14 @@ export function previewCsvImport(
     const errors: string[] = [];
     const warnings: string[] = [];
     let duplicateAssetId: string | undefined;
+    const classificationSuggestion = classifyAsset({
+      assetName: row.rawData.asset_name ?? "",
+      ticker: row.rawData.ticker,
+      market: row.rawData.market,
+      brokerProductType: row.rawData.broker_product_type,
+      rawAssetType: row.rawData.raw_asset_type,
+      currency: row.rawData.currency
+    });
 
     if (!input) {
       errors.push("asset_type은 공식 자산군 코드 중 하나여야 합니다.");
@@ -192,9 +191,29 @@ export function previewCsvImport(
       ) {
         errors.push("price_change_period_type 값이 공식 코드와 일치하지 않습니다.");
       }
+      if (!row.rawData.currency) {
+        errors.push("currency는 필수입니다.");
+      }
+      if (row.rawData.ticker && !row.rawData.market) {
+        errors.push("ticker가 있는 행은 market을 함께 입력해야 합니다.");
+      }
+      if (row.rawData.ticker && !/^[A-Z0-9.\-]{1,20}$/i.test(row.rawData.ticker)) {
+        warnings.push("ticker 형식이 일반적인 종목코드 형식과 다릅니다.");
+      }
       const validation = validateAssetInput(input);
       errors.push(...validation.errors);
       warnings.push(...validation.warnings, ...validation.confirmations);
+      if (
+        input.quantity &&
+        input.purchaseUnitPrice &&
+        Math.abs(input.quantity * input.purchaseUnitPrice - input.valuationAmount) /
+          input.valuationAmount >
+          0.1
+      ) {
+        warnings.push(
+          "수량과 단가로 계산한 금액이 입력 평가금액과 10% 이상 다릅니다."
+        );
+      }
       const duplicate = detectDuplicateAsset(state.assets, input);
       if (duplicate) {
         duplicateAssetId = duplicate.id;
@@ -210,21 +229,27 @@ export function previewCsvImport(
       rowNumber: row.rowNumber,
       rawData: row.rawData,
       parsedData: input as unknown as Partial<Asset>,
+      mappedData: input as unknown as Partial<Asset>,
       validationStatus:
         errors.length > 0 ? "invalid" : warnings.length > 0 ? "warning" : "valid",
       errors,
       warnings,
+      duplicateStatus: duplicateAssetId ? "possible" : "none",
       duplicateAssetId,
+      classificationSuggestion,
       createdAt: now
     };
   });
   const job: CsvImportJob = {
     id: jobId,
     filename: params.filename,
+    importType: params.importType ?? "standard",
+    brokerName: params.brokerName,
     totalRows: rows.length,
     validRows: rows.filter((row) => row.validationStatus === "valid").length,
     invalidRows: rows.filter((row) => row.validationStatus === "invalid").length,
     warningRows: rows.filter((row) => row.validationStatus === "warning").length,
+    duplicateRows: rows.filter((row) => row.duplicateAssetId).length,
     status: "validated",
     errorSummary:
       rows.some((row) => row.validationStatus === "invalid")
@@ -252,7 +277,12 @@ export function previewCsvImport(
 
 export function confirmCsvImport(
   state: AppState,
-  params: { jobId: string; createSnapshot?: boolean }
+  params: {
+    jobId: string;
+    createSnapshot?: boolean;
+    confirmedAssetTypes?: Record<string, AssetType>;
+    duplicateHandling?: Record<string, DuplicateAssetPolicy>;
+  }
 ): { state: AppState; job?: CsvImportJob; createdAssets: Asset[] } {
   const rows = state.csvImportRows.filter(
     (row) =>
@@ -260,20 +290,44 @@ export function confirmCsvImport(
   );
   const createdAssets = rows
     .map((row) => {
-      const input = parseCsvRowToAssetInput(row.rawData);
+      const handling = params.duplicateHandling?.[row.id] ?? "add";
+      if (row.duplicateAssetId && handling === "skip") return null;
+      const input = parseCsvRowToAssetInput(
+        row.rawData,
+        params.confirmedAssetTypes?.[row.id]
+      );
       return input ? createAssetFromInput(input) : null;
     })
     .filter((asset): asset is Asset => asset !== null);
+  const replaceIds = new Set(
+    rows
+      .filter(
+        (row) =>
+          row.duplicateAssetId &&
+          params.duplicateHandling?.[row.id] === "replace"
+      )
+      .map((row) => row.duplicateAssetId as string)
+  );
   let nextState: AppState = {
     ...state,
-    assets: [...state.assets, ...createdAssets],
+    assets: [
+      ...state.assets.filter((asset) => !replaceIds.has(asset.id)),
+      ...createdAssets
+    ],
     csvImportRows: state.csvImportRows.map((row) => {
       const createdAsset = createdAssets.find((asset) => {
-        const input = parseCsvRowToAssetInput(row.rawData);
+        const input = parseCsvRowToAssetInput(
+          row.rawData,
+          params.confirmedAssetTypes?.[row.id]
+        );
         return input && asset.assetName === input.assetName;
       });
       return row.importJobId === params.jobId
-        ? { ...row, createdAssetId: createdAsset?.id }
+        ? {
+            ...row,
+            createdAssetId: createdAsset?.id,
+            duplicateStatus: row.duplicateAssetId ? "confirmed" : row.duplicateStatus
+          }
         : row;
     })
   };

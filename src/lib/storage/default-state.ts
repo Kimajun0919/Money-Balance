@@ -92,9 +92,12 @@ export function createSampleAssets(): Asset[] {
     createAssetFromInput({
       assetName: "성장 자산군",
       assetType: "growth",
+      ticker: "SPY",
+      market: "NYSE",
       valuationAmount: 15_000,
       currency: "USD",
       exchangeRate: 1350,
+      quantity: 30,
       incomeYield: 0.01,
       expectedCapitalReturn: 0.09,
       priceChangeRate: 0.06,
@@ -119,6 +122,12 @@ export function createDefaultState(): AppState {
     emailLogs: [],
     notificationSettings: createDefaultNotificationSettings(),
     csvImportJobs: [],
-    csvImportRows: []
+    csvImportRows: [],
+    marketPriceSnapshots: [],
+    fxRateSnapshots: [],
+    assetPriceLinks: [],
+    externalAssetMappings: [],
+    externalConnections: [],
+    externalSyncLogs: []
   };
 }

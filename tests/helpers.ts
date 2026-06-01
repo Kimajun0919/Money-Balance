@@ -11,6 +11,9 @@ export function makeAsset(overrides: {
   priceChangeRate?: number;
   fxChangeRate?: number;
   accountType?: AccountType;
+  ticker?: string;
+  market?: string;
+  quantity?: number;
 } = {}): Asset {
   const assetType = overrides.assetType ?? "cash";
   const accountType = overrides.accountType ?? "general";
@@ -21,6 +24,9 @@ export function makeAsset(overrides: {
     valuationAmount: overrides.amount ?? 10_000_000,
     currency: overrides.currency ?? "KRW",
     exchangeRate: overrides.exchangeRate ?? 1,
+    ticker: overrides.ticker,
+    market: overrides.market,
+    quantity: overrides.quantity,
     incomeYield: overrides.incomeYield ?? 0,
     expectedCapitalReturn: overrides.expectedCapitalReturn ?? 0,
     priceChangeRate: overrides.priceChangeRate ?? 0,

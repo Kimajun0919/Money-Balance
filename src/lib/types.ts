@@ -56,6 +56,7 @@ export type SnapshotSource =
   | "manual"
   | "reminder_based"
   | "imported"
+  | "broker_sync"
   | "system_generated";
 export type DuplicateSnapshotPolicy = "new" | "replace" | "cancel";
 export type AllocationGapStatus = "below" | "above" | "within";
@@ -81,11 +82,49 @@ export type PeriodFilter = "3m" | "6m" | "12m" | "all";
 export type CsvImportStatus =
   | "uploaded"
   | "parsed"
+  | "mapped"
   | "validated"
   | "imported"
   | "failed"
   | "canceled";
 export type CsvRowValidationStatus = "valid" | "warning" | "invalid";
+export type CsvImportType = "standard" | "generic" | "broker_specific";
+export type DuplicateAssetPolicy = "skip" | "add" | "replace" | "merge";
+export type DuplicateAssetStatus = "none" | "possible" | "confirmed";
+export type ValuationSource =
+  | "manual"
+  | "csv_import"
+  | "broker_sync"
+  | "market_price"
+  | "mixed";
+export type ExternalProviderType = "market_data" | "fx_rate" | "broker";
+export type ExternalConnectionStatus =
+  | "connected"
+  | "disconnected"
+  | "failed"
+  | "deleted";
+export type ExternalSyncStatus =
+  | "started"
+  | "previewed"
+  | "applied"
+  | "success"
+  | "partial_success"
+  | "failed";
+export type ExternalSyncType =
+  | "market_price"
+  | "fx_rate"
+  | "csv_import"
+  | "broker_connection"
+  | "broker_holdings"
+  | "broker_cash"
+  | "broker_delete";
+export type MappingSource = "auto" | "user" | "system_default" | "broker_metadata";
+export type DataFreshnessType =
+  | "market_price"
+  | "fx_rate"
+  | "broker_holdings"
+  | "csv_import"
+  | "manual";
 
 export interface UserProfile {
   id?: string;
@@ -106,6 +145,12 @@ export interface Asset {
   userId?: string;
   assetName: string;
   assetType: AssetType;
+  ticker?: string;
+  market?: string;
+  brokerName?: string;
+  accountAlias?: string;
+  externalConnectionId?: string;
+  externalAssetId?: string;
   valuationAmount: number;
   currency: string;
   exchangeRate: number;
@@ -130,6 +175,14 @@ export interface Asset {
   riskCoefficient: number;
   liquidityLevel: LiquidityLevel;
   liquidityScore: number;
+  valuationSource?: ValuationSource;
+  priceSource?: string;
+  fxSource?: string;
+  lastSyncedAt?: string;
+  lastPriceUpdatedAt?: string;
+  lastFxUpdatedAt?: string;
+  isAutoImported?: boolean;
+  userConfirmedAssetType?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -441,10 +494,13 @@ export interface CsvImportJob {
   id: string;
   userId?: string;
   filename: string;
+  importType?: CsvImportType;
+  brokerName?: string;
   totalRows: number;
   validRows: number;
   invalidRows: number;
   warningRows: number;
+  duplicateRows?: number;
   status: CsvImportStatus;
   errorSummary?: string;
   createdSnapshotId?: string;
@@ -458,12 +514,130 @@ export interface CsvImportRow {
   rowNumber: number;
   rawData: Record<string, string>;
   parsedData?: Partial<Asset>;
+  mappedData?: Partial<Asset>;
   validationStatus: CsvRowValidationStatus;
   errors: string[];
   warnings: string[];
+  duplicateStatus?: DuplicateAssetStatus;
   duplicateAssetId?: string;
   createdAssetId?: string;
+  classificationSuggestion?: AssetClassificationResult;
   createdAt: string;
+}
+
+export interface MarketPriceSnapshot {
+  id: string;
+  ticker: string;
+  market: string;
+  currency: string;
+  price: number;
+  priceDate: string;
+  source: string;
+  fetchedAt: string;
+  isDelayed: boolean;
+  delayMinutes: number;
+  rawData?: Record<string, unknown>;
+  createdAt: string;
+}
+
+export interface FxRateSnapshot {
+  id: string;
+  baseCurrency: string;
+  quoteCurrency: string;
+  rate: number;
+  rateDate: string;
+  source: string;
+  fetchedAt: string;
+  isEstimated: boolean;
+  rawData?: Record<string, unknown>;
+  createdAt: string;
+}
+
+export interface AssetPriceLink {
+  id: string;
+  assetId: string;
+  ticker: string;
+  market: string;
+  priceSource: string;
+  fxSource?: string;
+  autoPriceEnabled: boolean;
+  autoFxEnabled: boolean;
+  lastPriceUpdatedAt?: string;
+  lastFxUpdatedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ExternalAssetMapping {
+  id: string;
+  provider: string;
+  externalAssetId: string;
+  assetName: string;
+  ticker?: string;
+  market?: string;
+  currency: string;
+  rawAssetType?: string;
+  mappedAssetType: AssetType;
+  confidenceScore: number;
+  mappingSource: MappingSource;
+  userConfirmed: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ExternalConnection {
+  id: string;
+  userId?: string;
+  providerType: ExternalProviderType;
+  providerName: string;
+  brokerName?: string;
+  accountAlias?: string;
+  accountIdentifierMasked?: string;
+  encryptedAccessToken?: string;
+  encryptedRefreshToken?: string;
+  tokenPreview?: string;
+  scopes: string[];
+  status: ExternalConnectionStatus;
+  consentAcceptedAt?: string;
+  lastSyncedAt?: string;
+  lastError?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ExternalSyncLog {
+  id: string;
+  userId?: string;
+  connectionId?: string;
+  providerType: ExternalProviderType;
+  providerName: string;
+  syncType: ExternalSyncType;
+  status: ExternalSyncStatus;
+  startedAt: string;
+  completedAt?: string;
+  totalItems: number;
+  successItems: number;
+  failedItems: number;
+  warningItems: number;
+  errorMessage?: string;
+  snapshotId?: string;
+  rawSummary?: Record<string, unknown>;
+}
+
+export interface AssetClassificationResult {
+  suggestedAssetType: AssetType;
+  confidenceScore: number;
+  reason: string;
+}
+
+export interface DataFreshnessWarning {
+  type: DataFreshnessType;
+  assetId?: string;
+  assetName?: string;
+  source?: string;
+  fetchedAt?: string;
+  stale: boolean;
+  message: string;
 }
 
 export interface AppState {
@@ -478,4 +652,10 @@ export interface AppState {
   notificationSettings: UserNotificationSettings;
   csvImportJobs: CsvImportJob[];
   csvImportRows: CsvImportRow[];
+  marketPriceSnapshots: MarketPriceSnapshot[];
+  fxRateSnapshots: FxRateSnapshot[];
+  assetPriceLinks: AssetPriceLink[];
+  externalAssetMappings: ExternalAssetMapping[];
+  externalConnections: ExternalConnection[];
+  externalSyncLogs: ExternalSyncLog[];
 }

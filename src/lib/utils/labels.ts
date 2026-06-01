@@ -1,7 +1,9 @@
 import type {
   AccountType,
+  CsvImportType,
   CsvImportStatus,
   EmailStatus,
+  ExternalConnectionStatus,
   IllusionWarningLevel,
   InvestmentHorizon,
   NotificationPriority,
@@ -10,7 +12,8 @@ import type {
   RebalanceStatus,
   RiskGrade,
   SnapshotSource,
-  SuggestionStatus
+  SuggestionStatus,
+  ValuationSource
 } from "@/lib/types";
 
 export const INVESTMENT_HORIZON_LABELS: Record<InvestmentHorizon, string> = {
@@ -56,6 +59,7 @@ export const SNAPSHOT_SOURCE_LABELS: Record<SnapshotSource, string> = {
   manual: "수동 저장",
   reminder_based: "알림 기반",
   imported: "CSV 가져오기",
+  broker_sync: "증권사 동기화",
   system_generated: "시스템 생성"
 };
 
@@ -94,10 +98,40 @@ export const EMAIL_STATUS_LABELS: Record<EmailStatus, string> = {
 export const CSV_IMPORT_STATUS_LABELS: Record<CsvImportStatus, string> = {
   uploaded: "업로드",
   parsed: "파싱",
+  mapped: "매핑 완료",
   validated: "검증 완료",
   imported: "가져오기 완료",
   failed: "실패",
   canceled: "취소"
+};
+
+export const CSV_IMPORT_TYPE_LABELS: Record<CsvImportType, string> = {
+  standard: "표준 CSV",
+  generic: "일반 CSV",
+  broker_specific: "증권사 CSV"
+};
+
+export const VALUATION_SOURCE_LABELS: Record<ValuationSource, string> = {
+  manual: "수동 입력",
+  csv_import: "CSV 가져오기",
+  broker_sync: "증권사 동기화",
+  market_price: "시세 자동 갱신",
+  mixed: "혼합 갱신"
+};
+
+export const EXTERNAL_CONNECTION_STATUS_LABELS: Record<
+  ExternalConnectionStatus,
+  string
+> = {
+  connected: "연결됨",
+  disconnected: "해제됨",
+  failed: "실패",
+  deleted: "데이터 삭제됨"
+};
+
+export const EXTERNAL_SCOPE_LABELS: Record<string, string> = {
+  read_holdings: "잔고 읽기",
+  read_cash: "현금 읽기"
 };
 
 export const RISK_GRADE_LABELS: Record<RiskGrade, string> = {

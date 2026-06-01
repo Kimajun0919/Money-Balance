@@ -19,6 +19,7 @@ import { ASSET_TYPE_SETTINGS } from "@/lib/constants/asset-types";
 import { buildPortfolioReview } from "@/lib/engines/portfolio-review-engine";
 import { logKpiEvent } from "@/lib/kpi/event-logger";
 import { createMonthlySnapshot } from "@/lib/services/snapshot-service";
+import { summarizeDataFreshness } from "@/lib/services/data-freshness-service";
 import { useAppState } from "@/hooks/use-app-state";
 import { formatKrw } from "@/lib/utils/currency";
 import {
@@ -31,6 +32,10 @@ export function DashboardClient() {
   const { state, updateState, loaded } = useAppState();
   const review = useMemo(
     () => buildPortfolioReview(state.profile, state.assets),
+    [state]
+  );
+  const freshnessWarnings = useMemo(
+    () => summarizeDataFreshness(state).filter((warning) => warning.stale),
     [state]
   );
   const latestSnapshot = state.snapshots[0];
@@ -173,6 +178,19 @@ export function DashboardClient() {
               className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"
             >
               {warning}
+            </p>
+          ))}
+        </section>
+      ) : null}
+
+      {freshnessWarnings.length > 0 ? (
+        <section className="space-y-2">
+          {freshnessWarnings.slice(0, 3).map((warning) => (
+            <p
+              key={`${warning.assetId}-${warning.type}`}
+              className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"
+            >
+              {warning.message}
             </p>
           ))}
         </section>

@@ -3,6 +3,20 @@ import type { AccountType, AssetType, PriceChangePeriodType } from "@/lib/types"
 export interface AssetInput {
   assetName: string;
   assetType: AssetType;
+  ticker?: string;
+  market?: string;
+  brokerName?: string;
+  accountAlias?: string;
+  externalConnectionId?: string;
+  externalAssetId?: string;
+  valuationSource?: "manual" | "csv_import" | "broker_sync" | "market_price" | "mixed";
+  priceSource?: string;
+  fxSource?: string;
+  lastSyncedAt?: string;
+  lastPriceUpdatedAt?: string;
+  lastFxUpdatedAt?: string;
+  isAutoImported?: boolean;
+  userConfirmedAssetType?: boolean;
   valuationAmount: number;
   currency: string;
   exchangeRate: number;
@@ -44,6 +58,18 @@ export function validateAssetInput(input: AssetInput): AssetValidationResult {
 
   if (input.currency.toUpperCase() !== "KRW" && input.exchangeRate <= 0) {
     errors.push("외화 자산은 환율을 0보다 크게 입력해야 합니다.");
+  }
+
+  if (!input.currency.trim()) {
+    errors.push("통화 코드는 필수입니다.");
+  }
+
+  if (input.ticker && !input.market?.trim()) {
+    errors.push("종목코드를 입력한 경우 거래시장을 함께 입력해야 합니다.");
+  }
+
+  if (input.ticker && !/^[A-Z0-9.\-]{1,20}$/i.test(input.ticker.trim())) {
+    warnings.push("종목코드 형식이 일반적인 티커 형식과 다릅니다.");
   }
 
   if (input.valuationAmount * input.exchangeRate < 0) {
