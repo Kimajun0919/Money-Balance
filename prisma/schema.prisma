@@ -1,0 +1,245 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum AssetType {
+  cash
+  savings
+  govt_bond
+  high_yield_bond
+  dividend
+  reit
+  covered_call
+  growth
+  alternative
+  etc
+}
+
+enum RiskTolerance {
+  conservative
+  moderate
+  growth
+  aggressive
+}
+
+enum AccountType {
+  general
+  isa
+  pension
+  irp
+  tax_free
+  unknown
+}
+
+enum PriceChangePeriodType {
+  one_month
+  three_months
+  six_months
+  one_year
+  since_purchase
+  custom
+}
+
+enum SuggestionType {
+  cash_shortage
+  risk_excess
+  illusion_warning
+  allocation_gap
+  return_gap
+  maintain
+}
+
+enum SuggestionStatus {
+  suggested
+  viewed
+  deferred
+  applied
+}
+
+model User {
+  id                   String              @id @default(cuid())
+  email                String              @unique
+  name                 String?
+  target_return        Decimal             @db.Decimal(8, 6)
+  risk_tolerance       RiskTolerance
+  loss_tolerance       Decimal             @db.Decimal(8, 6)
+  risk_score_limit     Int
+  min_cash_ratio       Decimal             @db.Decimal(8, 6)
+  monthly_investment   Decimal             @db.Decimal(18, 2) @default(0)
+  default_account_type AccountType         @default(general)
+  created_at           DateTime            @default(now())
+  updated_at           DateTime            @updatedAt
+  assets               Asset[]
+  snapshots            PortfolioSnapshot[]
+  suggestions          RebalanceSuggestion[]
+
+  @@map("users")
+}
+
+model Asset {
+  id                           String                 @id @default(cuid())
+  user_id                      String
+  user                         User                   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  asset_name                   String
+  asset_type                   AssetType
+  valuation_amount             Decimal                @db.Decimal(18, 2)
+  currency                     String                 @default("KRW")
+  exchange_rate                Decimal                @db.Decimal(18, 6) @default(1)
+  valuation_amount_krw         Decimal                @db.Decimal(18, 2)
+  quantity                     Decimal?               @db.Decimal(18, 6)
+  purchase_unit_price          Decimal?               @db.Decimal(18, 6)
+  purchase_amount              Decimal?               @db.Decimal(18, 2)
+  purchase_date                DateTime?
+  income_yield                 Decimal                @db.Decimal(8, 6)
+  expected_capital_return      Decimal                @db.Decimal(8, 6)
+  expected_return              Decimal                @db.Decimal(8, 6)
+  price_change_rate            Decimal                @db.Decimal(8, 6) @default(0)
+  price_change_period_type     PriceChangePeriodType?
+  price_change_start_date      DateTime?
+  price_change_end_date        DateTime?
+  price_change_rate_annualized Decimal                @db.Decimal(8, 6) @default(0)
+  fx_change_rate               Decimal                @db.Decimal(8, 6) @default(0)
+  income_tax_rate              Decimal                @db.Decimal(8, 6)
+  capital_gain_tax_rate        Decimal                @db.Decimal(8, 6)
+  account_type                 AccountType            @default(general)
+  risk_level                   String
+  risk_coefficient             Decimal                @db.Decimal(8, 6)
+  liquidity_level              String
+  liquidity_score              Int
+  created_at                   DateTime               @default(now())
+  updated_at                   DateTime               @updatedAt
+
+  @@index([user_id])
+  @@index([asset_type])
+  @@map("assets")
+}
+
+model TargetAllocationTemplate {
+  id                 String                 @id @default(cuid())
+  target_return_band Decimal                @db.Decimal(8, 6)
+  risk_tolerance     RiskTolerance
+  expected_return    Decimal                @db.Decimal(8, 6)
+  composition_risk   Int
+  template_version   String
+  is_active          Boolean                @default(true)
+  created_by         String                 @default("seed")
+  created_at         DateTime               @default(now())
+  updated_at         DateTime               @updatedAt
+  items              TargetAllocationItem[]
+
+  @@unique([target_return_band, risk_tolerance, template_version])
+  @@map("target_allocation_templates")
+}
+
+model TargetAllocationItem {
+  id           String                   @id @default(cuid())
+  template_id  String
+  template     TargetAllocationTemplate @relation(fields: [template_id], references: [id], onDelete: Cascade)
+  asset_type   AssetType
+  target_ratio Decimal                  @db.Decimal(8, 6)
+  min_ratio    Decimal                  @db.Decimal(8, 6)
+  max_ratio    Decimal                  @db.Decimal(8, 6)
+  created_at   DateTime                 @default(now())
+
+  @@unique([template_id, asset_type])
+  @@map("target_allocation_items")
+}
+
+model PortfolioSnapshot {
+  id                         String                  @id @default(cuid())
+  user_id                    String
+  user                       User                    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  snapshot_date              DateTime
+  total_asset_amount_krw     Decimal                 @db.Decimal(18, 2)
+  target_return              Decimal                 @db.Decimal(8, 6)
+  portfolio_expected_return  Decimal                 @db.Decimal(8, 6)
+  portfolio_income_yield     Decimal                 @db.Decimal(8, 6)
+  portfolio_income_amount    Decimal                 @db.Decimal(18, 2)
+  monthly_income_amount      Decimal                 @db.Decimal(18, 2)
+  after_tax_expected_return  Decimal                 @db.Decimal(8, 6)
+  total_return               Decimal                 @db.Decimal(8, 6)
+  risk_score                 Decimal                 @db.Decimal(8, 2)
+  risk_score_limit           Int
+  cash_ratio                 Decimal                 @db.Decimal(8, 6)
+  composition_risk           Int
+  target_gap                 Decimal                 @db.Decimal(8, 6)
+  primary_status             SuggestionType
+  active_flags               Json
+  created_at                 DateTime                @default(now())
+  items                      PortfolioSnapshotItem[]
+  suggestions                RebalanceSuggestion[]
+
+  @@index([user_id, snapshot_date])
+  @@map("portfolio_snapshots")
+}
+
+model PortfolioSnapshotItem {
+  id                String            @id @default(cuid())
+  snapshot_id       String
+  snapshot          PortfolioSnapshot @relation(fields: [snapshot_id], references: [id], onDelete: Cascade)
+  asset_type        AssetType
+  current_amount    Decimal           @db.Decimal(18, 2)
+  current_ratio     Decimal           @db.Decimal(8, 6)
+  target_ratio      Decimal           @db.Decimal(8, 6)
+  target_amount     Decimal           @db.Decimal(18, 2)
+  adjustment_amount Decimal           @db.Decimal(18, 2)
+  created_at        DateTime          @default(now())
+
+  @@map("portfolio_snapshot_items")
+}
+
+model RebalanceSuggestion {
+  id                      String            @id @default(cuid())
+  user_id                 String
+  user                    User              @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  snapshot_id             String?
+  snapshot                PortfolioSnapshot? @relation(fields: [snapshot_id], references: [id], onDelete: SetNull)
+  suggestion_type         SuggestionType
+  target_return           Decimal           @db.Decimal(8, 6)
+  current_expected_return Decimal           @db.Decimal(8, 6)
+  risk_score              Decimal           @db.Decimal(8, 2)
+  cash_ratio              Decimal           @db.Decimal(8, 6)
+  summary                 String
+  detail                  String
+  action_data             Json
+  status                  SuggestionStatus  @default(suggested)
+  created_at              DateTime          @default(now())
+  updated_at              DateTime          @updatedAt
+
+  @@index([user_id, status])
+  @@map("rebalance_suggestions")
+}
+
+model AssetTypeSetting {
+  id                      String    @id @default(cuid())
+  asset_type              AssetType @unique
+  default_income_yield    Decimal   @db.Decimal(8, 6)
+  default_capital_return  Decimal   @db.Decimal(8, 6)
+  default_expected_return Decimal   @db.Decimal(8, 6)
+  risk_coefficient        Decimal   @db.Decimal(8, 6)
+  default_risk_level      String
+  default_liquidity_level String
+  liquidity_score         Int
+  description             String
+  is_active               Boolean   @default(true)
+
+  @@map("asset_type_settings")
+}
+
+model TaxRateSetting {
+  id                    String      @id @default(cuid())
+  account_type          AccountType
+  asset_type            AssetType
+  income_tax_rate       Decimal     @db.Decimal(8, 6)
+  capital_gain_tax_rate Decimal     @db.Decimal(8, 6)
+  description           String
+  is_active             Boolean     @default(true)
+
+  @@unique([account_type, asset_type])
+  @@map("tax_rate_settings")
+}
