@@ -1,19 +1,25 @@
 "use client";
 
 import { useEffect, useMemo } from "react";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, Save } from "lucide-react";
 import { DisclaimerNote } from "@/components/common/disclaimer-note";
 import { MetricCard } from "@/components/common/metric-card";
 import { StatusBadge } from "@/components/common/status-badge";
 import { ASSET_TYPE_SETTINGS } from "@/lib/constants/asset-types";
 import { buildPortfolioReview } from "@/lib/engines/portfolio-review-engine";
 import { logKpiEvent } from "@/lib/kpi/event-logger";
+import {
+  saveMonthlyAllocationPlan,
+  updateMonthlyAllocationPlanStatus
+} from "@/lib/services/monthly-allocation-plan-service";
 import { useAppState } from "@/hooks/use-app-state";
 import { formatKrw } from "@/lib/utils/currency";
 import { formatPercent } from "@/lib/utils/percentage";
+import { SUGGESTION_STATUS_LABELS } from "@/lib/utils/labels";
+import type { SuggestionStatus } from "@/lib/types";
 
 export function RebalanceClient() {
-  const { state, loaded } = useAppState();
+  const { state, updateState, loaded } = useAppState();
   const review = useMemo(
     () => buildPortfolioReview(state.profile, state.assets),
     [state]
@@ -21,6 +27,12 @@ export function RebalanceClient() {
   const negativeAdjustments = review.rebalance.items.filter(
     (item) => item.adjustmentAmount < 0
   );
+  const latestSnapshot = [...state.snapshots]
+    .filter((snapshot) => !snapshot.isArchived)
+    .sort(
+      (a, b) =>
+        new Date(b.snapshotDate).getTime() - new Date(a.snapshotDate).getTime()
+    )[0];
 
   useEffect(() => {
     if (!loaded) return;
@@ -31,6 +43,15 @@ export function RebalanceClient() {
       monthlyInvestment: state.profile.monthlyInvestment
     });
   }, [loaded, review.rebalance.primaryStatus, state.profile.monthlyInvestment]);
+
+  function savePlan() {
+    const result = saveMonthlyAllocationPlan(state, latestSnapshot?.id);
+    updateState(result.state);
+  }
+
+  function updatePlanStatus(planId: string, status: SuggestionStatus) {
+    updateState(updateMonthlyAllocationPlanStatus(state, planId, status));
+  }
 
   return (
     <div className="space-y-6">
@@ -92,7 +113,17 @@ export function RebalanceClient() {
       </section>
 
       <section className="rounded-md border border-line bg-white p-5 shadow-panel">
-        <h2 className="text-lg font-bold text-ink">월 신규 투자금 배분</h2>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h2 className="text-lg font-bold text-ink">월 신규 투자금 배분</h2>
+          <button
+            type="button"
+            onClick={savePlan}
+            className="inline-flex h-10 items-center gap-2 rounded-md bg-mint px-4 text-sm font-semibold text-white"
+          >
+            <Save size={17} aria-hidden="true" />
+            배분 계획 저장
+          </button>
+        </div>
         <div className="table-scroll mt-4 overflow-x-auto">
           <table className="w-full min-w-[780px] text-sm">
             <thead>
@@ -133,6 +164,62 @@ export function RebalanceClient() {
                 <tr>
                   <td colSpan={5} className="py-8 text-center text-neutral-500">
                     월 신규 투자금이 입력되지 않았습니다.
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="rounded-md border border-line bg-white p-5 shadow-panel">
+        <h2 className="text-lg font-bold text-ink">저장된 배분 계획</h2>
+        <div className="table-scroll mt-4 overflow-x-auto">
+          <table className="w-full min-w-[780px] text-sm">
+            <thead>
+              <tr className="border-b border-line text-left text-neutral-500">
+                <th className="py-3 pr-3">저장일</th>
+                <th className="py-3 pr-3 text-right">월 신규 투자금</th>
+                <th className="py-3 pr-3 text-right">현금 우선</th>
+                <th className="py-3 pr-3">상태</th>
+                <th className="py-3 pr-3 text-right">변경</th>
+              </tr>
+            </thead>
+            <tbody>
+              {state.monthlyAllocationPlans.map((plan) => (
+                <tr key={plan.id} className="border-b border-line/70">
+                  <td className="py-3 pr-3">{plan.createdAt.slice(0, 10)}</td>
+                  <td className="py-3 pr-3 text-right">
+                    {formatKrw(plan.monthlyInvestmentAmount)}
+                  </td>
+                  <td className="py-3 pr-3 text-right">
+                    {formatKrw(plan.cashFirstAmount)}
+                  </td>
+                  <td className="py-3 pr-3">
+                    {SUGGESTION_STATUS_LABELS[plan.status]}
+                  </td>
+                  <td className="py-3 pr-3 text-right">
+                    <div className="flex justify-end gap-2">
+                      {(["viewed", "deferred", "applied"] as SuggestionStatus[]).map(
+                        (status) => (
+                          <button
+                            key={status}
+                            type="button"
+                            onClick={() => updatePlanStatus(plan.id, status)}
+                            className="rounded-md border border-line px-2 py-1 text-xs font-semibold text-neutral-700"
+                          >
+                            {SUGGESTION_STATUS_LABELS[status]}
+                          </button>
+                        )
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {state.monthlyAllocationPlans.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="py-8 text-center text-neutral-500">
+                    저장된 배분 계획이 없습니다.
                   </td>
                 </tr>
               ) : null}

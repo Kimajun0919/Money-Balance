@@ -52,6 +52,40 @@ export type RebalanceStatus =
   | "maintain";
 
 export type IllusionWarningLevel = "none" | "caution" | "warning" | "danger";
+export type SnapshotSource =
+  | "manual"
+  | "reminder_based"
+  | "imported"
+  | "system_generated";
+export type DuplicateSnapshotPolicy = "new" | "replace" | "cancel";
+export type AllocationGapStatus = "below" | "above" | "within";
+export type SuggestionStatus = "suggested" | "viewed" | "deferred" | "applied";
+export type NotificationType =
+  | "monthly_update_request"
+  | "cash_shortage"
+  | "risk_score_excess"
+  | "target_gap_warning"
+  | "illusion_warning"
+  | "rebalancing_needed"
+  | "report_ready";
+export type NotificationPriority = "low" | "medium" | "high" | "critical";
+export type EmailType =
+  | "monthly_update_reminder"
+  | "monthly_report_ready"
+  | "cash_shortage_warning"
+  | "risk_score_warning"
+  | "target_gap_warning"
+  | "illusion_warning";
+export type EmailStatus = "pending" | "sent" | "failed" | "skipped" | "mock_sent";
+export type PeriodFilter = "3m" | "6m" | "12m" | "all";
+export type CsvImportStatus =
+  | "uploaded"
+  | "parsed"
+  | "validated"
+  | "imported"
+  | "failed"
+  | "canceled";
+export type CsvRowValidationStatus = "valid" | "warning" | "invalid";
 
 export interface UserProfile {
   id?: string;
@@ -211,6 +245,12 @@ export interface RebalanceItem {
   hasAllocationGap: boolean;
 }
 
+export interface SnapshotItem extends RebalanceItem {
+  minRatio: number;
+  maxRatio: number;
+  allocationGapStatus: AllocationGapStatus;
+}
+
 export interface RebalanceResult {
   totalAssetAmountKrw: number;
   items: RebalanceItem[];
@@ -252,6 +292,7 @@ export interface StoredSnapshot {
   snapshotDate: string;
   totalAssetAmountKrw: number;
   targetReturn: number;
+  referencePortfolioExpectedReturn: number;
   portfolioExpectedReturn: number;
   portfolioIncomeYield: number;
   portfolioIncomeAmount: number;
@@ -265,7 +306,163 @@ export interface StoredSnapshot {
   targetGap: number;
   primaryStatus: RebalanceStatus;
   activeFlags: RebalanceStatus[];
-  items: RebalanceItem[];
+  snapshotSource: SnapshotSource;
+  isArchived: boolean;
+  replacedBySnapshotId?: string;
+  items: SnapshotItem[];
+  createdAt: string;
+}
+
+export interface MonthlyReportDetail {
+  assetChange: {
+    current: number;
+    previous?: number;
+    changeAmount?: number;
+    changeRate?: number;
+  };
+  returnChange: {
+    currentExpectedReturn: number;
+    previousExpectedReturn?: number;
+    change?: number;
+  };
+  riskChange: {
+    currentRiskScore: number;
+    previousRiskScore?: number;
+    change?: number;
+  };
+  allocationChanges: Array<{
+    assetType: AssetType;
+    currentRatio: number;
+    previousRatio?: number;
+    change?: number;
+  }>;
+  illusionWarningCount: number;
+  rebalancingSuggestionIds: string[];
+  monthlyAllocationPlanIds: string[];
+  messages: string[];
+}
+
+export interface MonthlyReport {
+  id: string;
+  userId?: string;
+  currentSnapshotId: string;
+  previousSnapshotId?: string;
+  reportMonth: string;
+  totalAssetChangeAmount?: number;
+  totalAssetChangeRate?: number;
+  expectedReturnChange?: number;
+  targetGapChange?: number;
+  incomeAmountChange?: number;
+  riskScoreChange?: number;
+  cashRatioChange?: number;
+  summary: string;
+  detailJson: MonthlyReportDetail;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MonthlyAllocationPlan {
+  id: string;
+  userId?: string;
+  snapshotId?: string;
+  monthlyInvestmentAmount: number;
+  cashFirstAmount: number;
+  remainingInvestmentAmount: number;
+  allocationData: MonthlyAllocationItem[];
+  excludedAssetTypes: AssetType[];
+  summary: string;
+  status: SuggestionStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RebalanceSuggestionRecord {
+  id: string;
+  userId?: string;
+  snapshotId?: string;
+  reportId?: string;
+  suggestionType: RebalanceStatus;
+  targetReturn: number;
+  currentExpectedReturn: number;
+  riskScore: number;
+  cashRatio: number;
+  summary: string;
+  detail: string;
+  actionData: Record<string, unknown>;
+  status: SuggestionStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Notification {
+  id: string;
+  userId?: string;
+  type: NotificationType;
+  title: string;
+  message: string;
+  linkUrl: string;
+  isRead: boolean;
+  priority: NotificationPriority;
+  createdAt: string;
+  readAt?: string;
+}
+
+export interface EmailLog {
+  id: string;
+  userId?: string;
+  emailType: EmailType;
+  toEmail: string;
+  subject: string;
+  bodyHtml: string;
+  bodyText: string;
+  status: EmailStatus;
+  providerMessageId?: string;
+  errorMessage?: string;
+  createdAt: string;
+  sentAt?: string;
+}
+
+export interface UserNotificationSettings {
+  id: string;
+  userId?: string;
+  inAppEnabled: boolean;
+  emailEnabled: boolean;
+  monthlyUpdateEnabled: boolean;
+  monthlyReportEnabled: boolean;
+  riskWarningEnabled: boolean;
+  targetGapWarningEnabled: boolean;
+  illusionWarningEnabled: boolean;
+  updateDayOfMonth: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CsvImportJob {
+  id: string;
+  userId?: string;
+  filename: string;
+  totalRows: number;
+  validRows: number;
+  invalidRows: number;
+  warningRows: number;
+  status: CsvImportStatus;
+  errorSummary?: string;
+  createdSnapshotId?: string;
+  createdAt: string;
+  completedAt?: string;
+}
+
+export interface CsvImportRow {
+  id: string;
+  importJobId: string;
+  rowNumber: number;
+  rawData: Record<string, string>;
+  parsedData?: Partial<Asset>;
+  validationStatus: CsvRowValidationStatus;
+  errors: string[];
+  warnings: string[];
+  duplicateAssetId?: string;
+  createdAssetId?: string;
   createdAt: string;
 }
 
@@ -273,4 +470,12 @@ export interface AppState {
   profile: UserProfile;
   assets: Asset[];
   snapshots: StoredSnapshot[];
+  monthlyReports: MonthlyReport[];
+  monthlyAllocationPlans: MonthlyAllocationPlan[];
+  rebalanceSuggestions: RebalanceSuggestionRecord[];
+  notifications: Notification[];
+  emailLogs: EmailLog[];
+  notificationSettings: UserNotificationSettings;
+  csvImportJobs: CsvImportJob[];
+  csvImportRows: CsvImportRow[];
 }

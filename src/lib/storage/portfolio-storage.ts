@@ -1,10 +1,38 @@
 "use client";
 
 import { buildPortfolioReview } from "@/lib/engines/portfolio-review-engine";
-import type { AppState, StoredSnapshot } from "@/lib/types";
+import type { AppState, SnapshotItem, StoredSnapshot } from "@/lib/types";
 import { createDefaultState } from "@/lib/storage/default-state";
 
 const STORAGE_KEY = "yield-balance-state-v1";
+
+function normalizeState(parsed: Partial<AppState>): AppState {
+  const defaults = createDefaultState();
+
+  return {
+    ...defaults,
+    ...parsed,
+    profile: {
+      ...defaults.profile,
+      ...parsed.profile
+    },
+    notificationSettings: {
+      ...defaults.notificationSettings,
+      ...parsed.notificationSettings
+    },
+    assets: parsed.assets ?? defaults.assets,
+    snapshots: parsed.snapshots ?? defaults.snapshots,
+    monthlyReports: parsed.monthlyReports ?? defaults.monthlyReports,
+    monthlyAllocationPlans:
+      parsed.monthlyAllocationPlans ?? defaults.monthlyAllocationPlans,
+    rebalanceSuggestions:
+      parsed.rebalanceSuggestions ?? defaults.rebalanceSuggestions,
+    notifications: parsed.notifications ?? defaults.notifications,
+    emailLogs: parsed.emailLogs ?? defaults.emailLogs,
+    csvImportJobs: parsed.csvImportJobs ?? defaults.csvImportJobs,
+    csvImportRows: parsed.csvImportRows ?? defaults.csvImportRows
+  };
+}
 
 export function loadAppState(): AppState {
   if (typeof window === "undefined") return createDefaultState();
@@ -12,10 +40,7 @@ export function loadAppState(): AppState {
   if (!raw) return createDefaultState();
 
   try {
-    return {
-      ...createDefaultState(),
-      ...JSON.parse(raw)
-    };
+    return normalizeState(JSON.parse(raw));
   } catch {
     return createDefaultState();
   }
@@ -32,12 +57,33 @@ export function resetAppState() {
 export function createSnapshotFromState(state: AppState): StoredSnapshot {
   const review = buildPortfolioReview(state.profile, state.assets);
   const now = new Date().toISOString();
+  const items: SnapshotItem[] = review.rebalance.items.map((item) => {
+    const allocation = review.targetAllocation.allocations.find(
+      (targetItem) => targetItem.assetType === item.assetType
+    );
+    const minRatio = allocation?.minRatio ?? Math.max(0, item.targetRatio - 0.03);
+    const maxRatio = allocation?.maxRatio ?? Math.min(1, item.targetRatio + 0.03);
+    const allocationGapStatus =
+      item.currentRatio < minRatio
+        ? "below"
+        : item.currentRatio > maxRatio
+          ? "above"
+          : "within";
+
+    return {
+      ...item,
+      minRatio,
+      maxRatio,
+      allocationGapStatus
+    };
+  });
 
   return {
     id: crypto.randomUUID(),
     snapshotDate: now.slice(0, 10),
     totalAssetAmountKrw: review.returns.totalAssetAmountKrw,
     targetReturn: state.profile.targetReturn,
+    referencePortfolioExpectedReturn: review.targetAllocation.expectedReturn,
     portfolioExpectedReturn: review.returns.expectedReturn,
     portfolioIncomeYield: review.returns.incomeYield,
     portfolioIncomeAmount: review.returns.annualIncomeAmount,
@@ -51,7 +97,9 @@ export function createSnapshotFromState(state: AppState): StoredSnapshot {
     targetGap: review.targetAllocation.targetGap,
     primaryStatus: review.rebalance.primaryStatus,
     activeFlags: review.rebalance.activeFlags,
-    items: review.rebalance.items,
+    snapshotSource: "manual",
+    isArchived: false,
+    items,
     createdAt: now
   };
 }

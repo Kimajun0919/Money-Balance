@@ -4,10 +4,16 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   BarChart3,
+  Bell,
   Calculator,
+  FileText,
+  History,
   LayoutDashboard,
+  LineChart,
   ListChecks,
   PieChart,
+  Settings,
+  Upload,
   WalletCards
 } from "lucide-react";
 import type { ReactNode } from "react";
@@ -16,8 +22,15 @@ const navItems = [
   { href: "/dashboard", label: "대시보드", icon: LayoutDashboard },
   { href: "/onboarding", label: "온보딩", icon: Calculator },
   { href: "/assets", label: "자산 등록", icon: WalletCards },
+  { href: "/snapshots", label: "스냅샷", icon: History },
+  { href: "/reports", label: "리포트", icon: FileText },
   { href: "/target-portfolio", label: "목표 포트폴리오", icon: PieChart },
-  { href: "/rebalance", label: "리밸런싱", icon: ListChecks }
+  { href: "/rebalance", label: "리밸런싱", icon: ListChecks },
+  { href: "/rebalance/history", label: "이력", icon: History },
+  { href: "/trends", label: "추이", icon: LineChart },
+  { href: "/notifications", label: "알림", icon: Bell },
+  { href: "/settings/notifications", label: "알림 설정", icon: Settings },
+  { href: "/import/csv", label: "CSV", icon: Upload }
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {

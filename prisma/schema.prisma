@@ -61,6 +61,62 @@ enum SuggestionStatus {
   applied
 }
 
+enum SnapshotSource {
+  manual
+  reminder_based
+  imported
+  system_generated
+}
+
+enum NotificationType {
+  monthly_update_request
+  cash_shortage
+  risk_score_excess
+  target_gap_warning
+  illusion_warning
+  rebalancing_needed
+  report_ready
+}
+
+enum NotificationPriority {
+  low
+  medium
+  high
+  critical
+}
+
+enum EmailType {
+  monthly_update_reminder
+  monthly_report_ready
+  cash_shortage_warning
+  risk_score_warning
+  target_gap_warning
+  illusion_warning
+}
+
+enum EmailStatus {
+  pending
+  sent
+  failed
+  skipped
+  mock_sent
+}
+
+enum CsvImportStatus {
+  uploaded
+  parsed
+  validated
+  imported
+  failed
+  canceled
+}
+
+enum CsvRowValidationStatus {
+  valid
+  warning
+  invalid
+}
+
 model User {
   id                   String              @id @default(cuid())
   email                String              @unique
@@ -77,6 +133,12 @@ model User {
   assets               Asset[]
   snapshots            PortfolioSnapshot[]
   suggestions          RebalanceSuggestion[]
+  monthly_reports      MonthlyReport[]
+  monthly_allocation_plans MonthlyAllocationPlan[]
+  notifications        Notification[]
+  email_logs           EmailLog[]
+  notification_settings UserNotificationSetting?
+  csv_import_jobs      CsvImportJob[]
 
   @@map("users")
 }
@@ -157,6 +219,7 @@ model PortfolioSnapshot {
   snapshot_date              DateTime
   total_asset_amount_krw     Decimal                 @db.Decimal(18, 2)
   target_return              Decimal                 @db.Decimal(8, 6)
+  reference_portfolio_expected_return Decimal        @db.Decimal(8, 6) @default(0)
   portfolio_expected_return  Decimal                 @db.Decimal(8, 6)
   portfolio_income_yield     Decimal                 @db.Decimal(8, 6)
   portfolio_income_amount    Decimal                 @db.Decimal(18, 2)
@@ -170,6 +233,9 @@ model PortfolioSnapshot {
   target_gap                 Decimal                 @db.Decimal(8, 6)
   primary_status             SuggestionType
   active_flags               Json
+  snapshot_source            SnapshotSource          @default(manual)
+  is_archived                Boolean                 @default(false)
+  replaced_by_snapshot_id    String?
   created_at                 DateTime                @default(now())
   items                      PortfolioSnapshotItem[]
   suggestions                RebalanceSuggestion[]
@@ -188,6 +254,9 @@ model PortfolioSnapshotItem {
   target_ratio      Decimal           @db.Decimal(8, 6)
   target_amount     Decimal           @db.Decimal(18, 2)
   adjustment_amount Decimal           @db.Decimal(18, 2)
+  min_ratio         Decimal           @db.Decimal(8, 6) @default(0)
+  max_ratio         Decimal           @db.Decimal(8, 6) @default(1)
+  allocation_gap_status String        @default("within")
   created_at        DateTime          @default(now())
 
   @@map("portfolio_snapshot_items")
@@ -199,6 +268,7 @@ model RebalanceSuggestion {
   user                    User              @relation(fields: [user_id], references: [id], onDelete: Cascade)
   snapshot_id             String?
   snapshot                PortfolioSnapshot? @relation(fields: [snapshot_id], references: [id], onDelete: SetNull)
+  report_id               String?
   suggestion_type         SuggestionType
   target_return           Decimal           @db.Decimal(8, 6)
   current_expected_return Decimal           @db.Decimal(8, 6)
@@ -213,6 +283,139 @@ model RebalanceSuggestion {
 
   @@index([user_id, status])
   @@map("rebalance_suggestions")
+}
+
+model MonthlyReport {
+  id                         String   @id @default(cuid())
+  user_id                    String
+  user                       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  current_snapshot_id        String
+  previous_snapshot_id       String?
+  report_month               String
+  total_asset_change_amount  Decimal? @db.Decimal(18, 2)
+  total_asset_change_rate    Decimal? @db.Decimal(8, 6)
+  expected_return_change     Decimal? @db.Decimal(8, 6)
+  target_gap_change          Decimal? @db.Decimal(8, 6)
+  income_amount_change       Decimal? @db.Decimal(18, 2)
+  risk_score_change          Decimal? @db.Decimal(8, 2)
+  cash_ratio_change          Decimal? @db.Decimal(8, 6)
+  summary                    String
+  detail_json                Json
+  created_at                 DateTime @default(now())
+  updated_at                 DateTime @updatedAt
+
+  @@index([user_id, report_month])
+  @@map("monthly_reports")
+}
+
+model MonthlyAllocationPlan {
+  id                         String           @id @default(cuid())
+  user_id                    String
+  user                       User             @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  snapshot_id                String?
+  monthly_investment_amount  Decimal          @db.Decimal(18, 2)
+  cash_first_amount          Decimal          @db.Decimal(18, 2)
+  remaining_investment_amount Decimal         @db.Decimal(18, 2)
+  allocation_data            Json
+  excluded_asset_types       Json
+  summary                    String
+  status                     SuggestionStatus @default(suggested)
+  created_at                 DateTime         @default(now())
+  updated_at                 DateTime         @updatedAt
+
+  @@index([user_id, status])
+  @@map("monthly_allocation_plans")
+}
+
+model Notification {
+  id         String               @id @default(cuid())
+  user_id    String
+  user       User                 @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  type       NotificationType
+  title      String
+  message    String
+  link_url   String
+  is_read    Boolean              @default(false)
+  priority   NotificationPriority @default(medium)
+  created_at DateTime             @default(now())
+  read_at    DateTime?
+
+  @@index([user_id, is_read])
+  @@map("notifications")
+}
+
+model EmailLog {
+  id                  String      @id @default(cuid())
+  user_id             String
+  user                User        @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  email_type          EmailType
+  to_email            String
+  subject             String
+  body_html           String
+  body_text           String
+  status              EmailStatus @default(pending)
+  provider_message_id String?
+  error_message       String?
+  created_at          DateTime    @default(now())
+  sent_at             DateTime?
+
+  @@index([user_id, email_type])
+  @@map("email_logs")
+}
+
+model UserNotificationSetting {
+  id                         String   @id @default(cuid())
+  user_id                    String   @unique
+  user                       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  in_app_enabled             Boolean  @default(true)
+  email_enabled              Boolean  @default(false)
+  monthly_update_enabled     Boolean  @default(true)
+  monthly_report_enabled     Boolean  @default(true)
+  risk_warning_enabled       Boolean  @default(true)
+  target_gap_warning_enabled Boolean  @default(true)
+  illusion_warning_enabled   Boolean  @default(true)
+  update_day_of_month        Int      @default(1)
+  created_at                 DateTime @default(now())
+  updated_at                 DateTime @updatedAt
+
+  @@map("user_notification_settings")
+}
+
+model CsvImportJob {
+  id                  String          @id @default(cuid())
+  user_id             String
+  user                User            @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  filename            String
+  total_rows          Int
+  valid_rows          Int
+  invalid_rows        Int
+  warning_rows        Int
+  status              CsvImportStatus @default(uploaded)
+  error_summary       String?
+  created_snapshot_id String?
+  created_at          DateTime        @default(now())
+  completed_at        DateTime?
+  rows                CsvImportRow[]
+
+  @@index([user_id, status])
+  @@map("csv_import_jobs")
+}
+
+model CsvImportRow {
+  id                String                 @id @default(cuid())
+  import_job_id     String
+  import_job        CsvImportJob           @relation(fields: [import_job_id], references: [id], onDelete: Cascade)
+  row_number        Int
+  raw_data          Json
+  parsed_data       Json?
+  validation_status CsvRowValidationStatus
+  errors            Json
+  warnings          Json
+  created_asset_id  String?
+  created_at        DateTime               @default(now())
+
+  @@index([import_job_id, validation_status])
+  @@map("csv_import_rows")
 }
 
 model AssetTypeSetting {

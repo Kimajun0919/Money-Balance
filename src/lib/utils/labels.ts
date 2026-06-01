@@ -1,9 +1,16 @@
 import type {
   AccountType,
+  CsvImportStatus,
+  EmailStatus,
   IllusionWarningLevel,
   InvestmentHorizon,
+  NotificationPriority,
+  NotificationType,
+  PeriodFilter,
   RebalanceStatus,
-  RiskGrade
+  RiskGrade,
+  SnapshotSource,
+  SuggestionStatus
 } from "@/lib/types";
 
 export const INVESTMENT_HORIZON_LABELS: Record<InvestmentHorizon, string> = {
@@ -36,6 +43,61 @@ export const STATUS_LABELS: Record<RebalanceStatus, string> = {
   allocation_gap: "배분 차이",
   return_gap: "목표 괴리",
   maintain: "유지"
+};
+
+export const SUGGESTION_STATUS_LABELS: Record<SuggestionStatus, string> = {
+  suggested: "제안",
+  viewed: "확인",
+  deferred: "보류",
+  applied: "반영"
+};
+
+export const SNAPSHOT_SOURCE_LABELS: Record<SnapshotSource, string> = {
+  manual: "수동 저장",
+  reminder_based: "알림 기반",
+  imported: "CSV 가져오기",
+  system_generated: "시스템 생성"
+};
+
+export const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
+  monthly_update_request: "월간 업데이트",
+  cash_shortage: "현금성 부족",
+  risk_score_excess: "위험 초과",
+  target_gap_warning: "목표 괴리",
+  illusion_warning: "고분배 착시",
+  rebalancing_needed: "리밸런싱 필요",
+  report_ready: "리포트 생성"
+};
+
+export const NOTIFICATION_PRIORITY_LABELS: Record<NotificationPriority, string> = {
+  low: "낮음",
+  medium: "보통",
+  high: "높음",
+  critical: "긴급"
+};
+
+export const PERIOD_FILTER_LABELS: Record<PeriodFilter, string> = {
+  "3m": "최근 3개월",
+  "6m": "최근 6개월",
+  "12m": "최근 12개월",
+  all: "전체"
+};
+
+export const EMAIL_STATUS_LABELS: Record<EmailStatus, string> = {
+  pending: "대기",
+  sent: "발송",
+  failed: "실패",
+  skipped: "건너뜀",
+  mock_sent: "모의 발송"
+};
+
+export const CSV_IMPORT_STATUS_LABELS: Record<CsvImportStatus, string> = {
+  uploaded: "업로드",
+  parsed: "파싱",
+  validated: "검증 완료",
+  imported: "가져오기 완료",
+  failed: "실패",
+  canceled: "취소"
 };
 
 export const RISK_GRADE_LABELS: Record<RiskGrade, string> = {

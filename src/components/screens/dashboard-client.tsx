@@ -18,9 +18,7 @@ import { StatusBadge } from "@/components/common/status-badge";
 import { ASSET_TYPE_SETTINGS } from "@/lib/constants/asset-types";
 import { buildPortfolioReview } from "@/lib/engines/portfolio-review-engine";
 import { logKpiEvent } from "@/lib/kpi/event-logger";
-import {
-  createSnapshotFromState
-} from "@/lib/storage/portfolio-storage";
+import { createMonthlySnapshot } from "@/lib/services/snapshot-service";
 import { useAppState } from "@/hooks/use-app-state";
 import { formatKrw } from "@/lib/utils/currency";
 import {
@@ -42,15 +40,11 @@ export function DashboardClient() {
   }, [loaded]);
 
   function saveSnapshot() {
-    const snapshot = createSnapshotFromState(state);
-    updateState({
-      ...state,
-      snapshots: [snapshot, ...state.snapshots]
+    const result = createMonthlySnapshot(state, {
+      duplicatePolicy: "new"
     });
-    logKpiEvent("snapshot_created", {
-      snapshotDate: snapshot.snapshotDate,
-      totalAssetAmountKrw: snapshot.totalAssetAmountKrw
-    });
+    if (!result.snapshot) return;
+    updateState(result.state);
   }
 
   return (

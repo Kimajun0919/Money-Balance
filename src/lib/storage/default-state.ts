@@ -1,10 +1,16 @@
 import { getDefaultTaxRate } from "@/lib/constants/tax-rates";
 import { calculateRiskScoreLimit } from "@/lib/engines/risk-score-engine";
-import type { AppState, Asset, UserProfile } from "@/lib/types";
+import type {
+  AppState,
+  Asset,
+  UserNotificationSettings,
+  UserProfile
+} from "@/lib/types";
 import { createAssetFromInput } from "@/lib/utils/asset-factory";
 
 export const DEFAULT_PROFILE: UserProfile = {
   name: "게스트",
+  email: "guest@example.com",
   targetReturn: 0.1,
   riskTolerance: "moderate",
   lossTolerance: -0.1,
@@ -14,6 +20,24 @@ export const DEFAULT_PROFILE: UserProfile = {
   investmentHorizon: "three_to_five",
   defaultAccountType: "general"
 };
+
+export function createDefaultNotificationSettings(): UserNotificationSettings {
+  const now = new Date().toISOString();
+
+  return {
+    id: crypto.randomUUID(),
+    inAppEnabled: true,
+    emailEnabled: false,
+    monthlyUpdateEnabled: true,
+    monthlyReportEnabled: true,
+    riskWarningEnabled: true,
+    targetGapWarningEnabled: true,
+    illusionWarningEnabled: true,
+    updateDayOfMonth: 1,
+    createdAt: now,
+    updatedAt: now
+  };
+}
 
 export function createSampleAssets(): Asset[] {
   const accountType = "general";
@@ -87,6 +111,14 @@ export function createDefaultState(): AppState {
   return {
     profile: DEFAULT_PROFILE,
     assets: [],
-    snapshots: []
+    snapshots: [],
+    monthlyReports: [],
+    monthlyAllocationPlans: [],
+    rebalanceSuggestions: [],
+    notifications: [],
+    emailLogs: [],
+    notificationSettings: createDefaultNotificationSettings(),
+    csvImportJobs: [],
+    csvImportRows: []
   };
 }
