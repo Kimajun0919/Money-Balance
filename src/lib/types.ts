@@ -125,6 +125,255 @@ export type DataFreshnessType =
   | "broker_holdings"
   | "csv_import"
   | "manual";
+export type TradingInstrumentKind =
+  | "stock"
+  | "etf"
+  | "fund"
+  | "bond"
+  | "cash"
+  | "crypto"
+  | "derivative"
+  | "option"
+  | "future"
+  | "leveraged_etf"
+  | "illiquid_asset"
+  | "unknown";
+export type TradingRecommendationAction = "buy" | "hold" | "reduce" | "watch";
+export type TradingOrderSide = "buy" | "sell";
+export type TradingOrderType = "market" | "limit";
+export type TradingExecutionMode = "paper" | "sandbox" | "live";
+export type TradingOrderProposalStatus =
+  | "draft"
+  | "blocked"
+  | "proposed"
+  | "confirmed"
+  | "submitted"
+  | "canceled";
+export type TradingAcknowledgementType =
+  | "risk_profile"
+  | "principal_loss"
+  | "live_trading"
+  | "auto_trading";
+export type TradingAuditEventType =
+  | "investor_profile_completed"
+  | "trading_acknowledgement_accepted"
+  | "recommendation_generated"
+  | "recommendation_viewed"
+  | "order_proposal_created"
+  | "order_proposal_confirmed"
+  | "order_blocked"
+  | "paper_order_submitted"
+  | "sandbox_order_submitted"
+  | "live_order_submitted"
+  | "auto_trading_rule_created"
+  | "auto_trading_rule_enabled"
+  | "auto_trading_rule_disabled"
+  | "auto_trade_triggered"
+  | "kill_switch_activated"
+  | "kill_switch_deactivated";
+export type AutoTradingRuleStatus = "disabled" | "enabled" | "blocked";
+export type AutoTradingStrategyType = "target_gap" | "watchlist_signal";
+
+export interface PrivateTradingFlags {
+  privateUseMode: boolean;
+  publicReleaseMode: boolean;
+  recommendationsEnabled: boolean;
+  paperTradingEnabled: boolean;
+  brokerSandboxEnabled: boolean;
+  liveTradingEnabled: boolean;
+  autoTradingEnabled: boolean;
+  brokerOrderApiConfigured: boolean;
+  brokerConnectionActive: boolean;
+  userTradingConsentAccepted: boolean;
+  userAutoTradingConsentAccepted: boolean;
+  riskProfileCompleted: boolean;
+  principalLossAcknowledged: boolean;
+  autoTradingRiskAcknowledged: boolean;
+  killSwitchActive: boolean;
+  updatedAt: string;
+}
+
+export interface PrivateTradingRiskLimits {
+  maxOrderAmountKrw: number;
+  maxDailyOrderAmountKrw: number;
+  maxMonthlyOrderAmountKrw: number;
+  maxOrdersPerDay: number;
+  minimumCashRatioAfterTrade: number;
+  maxRiskScoreAfterTrade: number;
+  staleDataMaxHours: number;
+  allowedInstrumentKinds: TradingInstrumentKind[];
+  blockedInstrumentKinds: TradingInstrumentKind[];
+  blockedTickers: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface InvestorProfile {
+  id: string;
+  riskProfileCompleted: boolean;
+  experienceLevel: "beginner" | "intermediate" | "advanced";
+  investmentObjective: "income" | "balanced" | "growth";
+  maxLossTolerance: number;
+  liquidityNeedMonths: number;
+  preferredAssetTypes: AssetType[];
+  allowedMarkets: string[];
+  completedAt?: string;
+  updatedAt: string;
+}
+
+export interface ProductUniverseItem {
+  id: string;
+  instrumentName: string;
+  ticker: string;
+  market: string;
+  currency: string;
+  instrumentKind: TradingInstrumentKind;
+  assetType: AssetType;
+  expectedReturn: number;
+  incomeYield: number;
+  riskScore: number;
+  riskLevel: RiskLevel;
+  liquidityLevel: LiquidityLevel;
+  liquidityScore: number;
+  lastPrice: number;
+  lastPriceUpdatedAt: string;
+  isActive: boolean;
+  isTradable: boolean;
+  isAutoTradingAllowed: boolean;
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface InstrumentRecommendation {
+  id: string;
+  instrumentId: string;
+  ticker: string;
+  instrumentName: string;
+  assetType: AssetType;
+  action: TradingRecommendationAction;
+  score: number;
+  rank: number;
+  suggestedOrderAmountKrw: number;
+  allocationGap: number;
+  expectedReturn: number;
+  riskScoreBefore: number;
+  riskScoreAfterEstimate: number;
+  reasons: string[];
+  warnings: string[];
+  blocked: boolean;
+  blockReasons: string[];
+  privateTradingFlagsSnapshot: PrivateTradingFlags;
+  createdAt: string;
+  viewedAt?: string;
+}
+
+export interface WatchlistItem {
+  id: string;
+  instrumentId: string;
+  ticker: string;
+  instrumentName: string;
+  priority: "low" | "medium" | "high";
+  note: string;
+  addedFromRecommendationId?: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TradeRiskCheckResult {
+  passed: boolean;
+  messages: string[];
+  projectedCashRatio: number;
+  projectedRiskScore: number;
+  dailyOrderAmountKrw: number;
+  monthlyOrderAmountKrw: number;
+  ordersToday: number;
+}
+
+export interface OrderProposal {
+  id: string;
+  recommendationId?: string;
+  instrumentId: string;
+  ticker: string;
+  instrumentName: string;
+  side: TradingOrderSide;
+  orderType: TradingOrderType;
+  executionMode: TradingExecutionMode;
+  amountKrw: number;
+  quantity?: number;
+  limitPrice?: number;
+  currency: string;
+  estimatedPrice: number;
+  estimatedFeesKrw: number;
+  status: TradingOrderProposalStatus;
+  riskCheckPassed: boolean;
+  riskCheckMessages: string[];
+  userConfirmedOrder: boolean;
+  privateTradingFlagsSnapshot: PrivateTradingFlags;
+  createdAt: string;
+  confirmedAt?: string;
+  submittedAt?: string;
+}
+
+export interface OrderEventLog {
+  id: string;
+  orderProposalId?: string;
+  eventType:
+    | "order_proposal_created"
+    | "order_proposal_confirmed"
+    | "order_blocked"
+    | "paper_order_submitted"
+    | "sandbox_order_submitted"
+    | "live_order_submitted";
+  executionMode: TradingExecutionMode;
+  instrumentId?: string;
+  ticker?: string;
+  amountKrw?: number;
+  status: "success" | "blocked" | "failed";
+  message: string;
+  privateTradingFlagsSnapshot: PrivateTradingFlags;
+  createdAt: string;
+}
+
+export interface TradingAuditLog {
+  id: string;
+  eventType: TradingAuditEventType;
+  entityType?: string;
+  entityId?: string;
+  summary: string;
+  metadata: Record<string, unknown>;
+  privateTradingFlagsSnapshot: PrivateTradingFlags;
+  createdAt: string;
+}
+
+export interface TradingAcknowledgement {
+  id: string;
+  acknowledgementType: TradingAcknowledgementType;
+  text: string;
+  acceptedAt: string;
+}
+
+export interface AutoTradingRule {
+  id: string;
+  name: string;
+  strategyType: AutoTradingStrategyType;
+  instrumentId: string;
+  ticker: string;
+  instrumentName: string;
+  side: TradingOrderSide;
+  status: AutoTradingRuleStatus;
+  enabled: boolean;
+  maxOrderAmountKrw: number;
+  maxDailyOrderAmountKrw: number;
+  maxOrdersPerDay: number;
+  minimumCashRatioAfterTrade: number;
+  maxRiskScoreAfterTrade: number;
+  privateTradingFlagsSnapshot: PrivateTradingFlags;
+  createdAt: string;
+  updatedAt: string;
+  lastTriggeredAt?: string;
+}
 
 export interface UserProfile {
   id?: string;
@@ -658,4 +907,15 @@ export interface AppState {
   externalAssetMappings: ExternalAssetMapping[];
   externalConnections: ExternalConnection[];
   externalSyncLogs: ExternalSyncLog[];
+  privateTradingFlags: PrivateTradingFlags;
+  privateTradingRiskLimits: PrivateTradingRiskLimits;
+  investorProfile: InvestorProfile;
+  productUniverse: ProductUniverseItem[];
+  recommendations: InstrumentRecommendation[];
+  watchlist: WatchlistItem[];
+  orderProposals: OrderProposal[];
+  orderEventLogs: OrderEventLog[];
+  tradingAuditLogs: TradingAuditLog[];
+  tradingAcknowledgements: TradingAcknowledgement[];
+  autoTradingRules: AutoTradingRule[];
 }

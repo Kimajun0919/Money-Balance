@@ -14,6 +14,7 @@ import {
   PieChart,
   Plug,
   Settings,
+  ShieldCheck,
   Upload,
   WalletCards
 } from "lucide-react";
@@ -27,6 +28,7 @@ const navItems = [
   { href: "/reports", label: "리포트", icon: FileText },
   { href: "/target-portfolio", label: "목표 포트폴리오", icon: PieChart },
   { href: "/rebalance", label: "리밸런싱", icon: ListChecks },
+  { href: "/trading", label: "거래 보조", icon: ShieldCheck },
   { href: "/rebalance/history", label: "이력", icon: History },
   { href: "/trends", label: "추이", icon: LineChart },
   { href: "/notifications", label: "알림", icon: Bell },

@@ -3,6 +3,10 @@ import { calculateRiskScoreLimit } from "@/lib/engines/risk-score-engine";
 import type {
   AppState,
   Asset,
+  InvestorProfile,
+  PrivateTradingFlags,
+  PrivateTradingRiskLimits,
+  ProductUniverseItem,
   UserNotificationSettings,
   UserProfile
 } from "@/lib/types";
@@ -37,6 +41,193 @@ export function createDefaultNotificationSettings(): UserNotificationSettings {
     createdAt: now,
     updatedAt: now
   };
+}
+
+export function createDefaultPrivateTradingFlags(): PrivateTradingFlags {
+  const now = new Date().toISOString();
+
+  return {
+    privateUseMode: true,
+    publicReleaseMode: false,
+    recommendationsEnabled: true,
+    paperTradingEnabled: true,
+    brokerSandboxEnabled: true,
+    liveTradingEnabled: false,
+    autoTradingEnabled: false,
+    brokerOrderApiConfigured: false,
+    brokerConnectionActive: false,
+    userTradingConsentAccepted: false,
+    userAutoTradingConsentAccepted: false,
+    riskProfileCompleted: false,
+    principalLossAcknowledged: false,
+    autoTradingRiskAcknowledged: false,
+    killSwitchActive: false,
+    updatedAt: now
+  };
+}
+
+export function createDefaultPrivateTradingRiskLimits(): PrivateTradingRiskLimits {
+  const now = new Date().toISOString();
+
+  return {
+    maxOrderAmountKrw: 1_000_000,
+    maxDailyOrderAmountKrw: 3_000_000,
+    maxMonthlyOrderAmountKrw: 10_000_000,
+    maxOrdersPerDay: 5,
+    minimumCashRatioAfterTrade: 0.05,
+    maxRiskScoreAfterTrade: 80,
+    staleDataMaxHours: 24,
+    allowedInstrumentKinds: ["stock", "etf", "fund", "bond", "cash"],
+    blockedInstrumentKinds: [
+      "crypto",
+      "derivative",
+      "option",
+      "future",
+      "leveraged_etf",
+      "illiquid_asset"
+    ],
+    blockedTickers: [],
+    createdAt: now,
+    updatedAt: now
+  };
+}
+
+export function createDefaultInvestorProfile(): InvestorProfile {
+  const now = new Date().toISOString();
+
+  return {
+    id: crypto.randomUUID(),
+    riskProfileCompleted: false,
+    experienceLevel: "intermediate",
+    investmentObjective: "balanced",
+    maxLossTolerance: 0.1,
+    liquidityNeedMonths: 6,
+    preferredAssetTypes: ["cash", "govt_bond", "dividend", "growth"],
+    allowedMarkets: ["KRX", "NYSE", "NASDAQ"],
+    updatedAt: now
+  };
+}
+
+export function createDefaultProductUniverse(): ProductUniverseItem[] {
+  const now = new Date().toISOString();
+
+  return [
+    {
+      id: "instrument_krw_cash",
+      instrumentName: "원화 현금 대기",
+      ticker: "KRW-CASH",
+      market: "KRW",
+      currency: "KRW",
+      instrumentKind: "cash",
+      assetType: "cash",
+      expectedReturn: 0.028,
+      incomeYield: 0.028,
+      riskScore: 5,
+      riskLevel: "low",
+      liquidityLevel: "high",
+      liquidityScore: 0,
+      lastPrice: 1,
+      lastPriceUpdatedAt: now,
+      isActive: true,
+      isTradable: true,
+      isAutoTradingAllowed: false,
+      notes: "현금성 비중 보정용 대기 항목",
+      createdAt: now,
+      updatedAt: now
+    },
+    {
+      id: "instrument_spy",
+      instrumentName: "SPDR S&P 500 ETF",
+      ticker: "SPY",
+      market: "NYSE",
+      currency: "USD",
+      instrumentKind: "etf",
+      assetType: "growth",
+      expectedReturn: 0.08,
+      incomeYield: 0.012,
+      riskScore: 72,
+      riskLevel: "very_high",
+      liquidityLevel: "high",
+      liquidityScore: 15,
+      lastPrice: 520,
+      lastPriceUpdatedAt: now,
+      isActive: true,
+      isTradable: true,
+      isAutoTradingAllowed: false,
+      notes: "성장 자산군 대표 ETF 예시",
+      createdAt: now,
+      updatedAt: now
+    },
+    {
+      id: "instrument_schd",
+      instrumentName: "Schwab US Dividend Equity ETF",
+      ticker: "SCHD",
+      market: "NYSE",
+      currency: "USD",
+      instrumentKind: "etf",
+      assetType: "dividend",
+      expectedReturn: 0.065,
+      incomeYield: 0.035,
+      riskScore: 58,
+      riskLevel: "high",
+      liquidityLevel: "high",
+      liquidityScore: 20,
+      lastPrice: 80,
+      lastPriceUpdatedAt: now,
+      isActive: true,
+      isTradable: true,
+      isAutoTradingAllowed: false,
+      notes: "배당 자산군 대표 ETF 예시",
+      createdAt: now,
+      updatedAt: now
+    },
+    {
+      id: "instrument_tlt",
+      instrumentName: "iShares 20+ Year Treasury Bond ETF",
+      ticker: "TLT",
+      market: "NASDAQ",
+      currency: "USD",
+      instrumentKind: "etf",
+      assetType: "govt_bond",
+      expectedReturn: 0.045,
+      incomeYield: 0.038,
+      riskScore: 45,
+      riskLevel: "medium",
+      liquidityLevel: "high",
+      liquidityScore: 20,
+      lastPrice: 92,
+      lastPriceUpdatedAt: now,
+      isActive: true,
+      isTradable: true,
+      isAutoTradingAllowed: false,
+      notes: "국공채 자산군 대표 ETF 예시",
+      createdAt: now,
+      updatedAt: now
+    },
+    {
+      id: "instrument_jepi",
+      instrumentName: "JPMorgan Equity Premium Income ETF",
+      ticker: "JEPI",
+      market: "NYSE",
+      currency: "USD",
+      instrumentKind: "etf",
+      assetType: "covered_call",
+      expectedReturn: 0.07,
+      incomeYield: 0.075,
+      riskScore: 68,
+      riskLevel: "high",
+      liquidityLevel: "medium",
+      liquidityScore: 35,
+      lastPrice: 57,
+      lastPriceUpdatedAt: now,
+      isActive: true,
+      isTradable: true,
+      isAutoTradingAllowed: false,
+      notes: "커버드콜 자산군 대표 ETF 예시",
+      createdAt: now,
+      updatedAt: now
+    }
+  ];
 }
 
 export function createSampleAssets(): Asset[] {
@@ -128,6 +319,17 @@ export function createDefaultState(): AppState {
     assetPriceLinks: [],
     externalAssetMappings: [],
     externalConnections: [],
-    externalSyncLogs: []
+    externalSyncLogs: [],
+    privateTradingFlags: createDefaultPrivateTradingFlags(),
+    privateTradingRiskLimits: createDefaultPrivateTradingRiskLimits(),
+    investorProfile: createDefaultInvestorProfile(),
+    productUniverse: createDefaultProductUniverse(),
+    recommendations: [],
+    watchlist: [],
+    orderProposals: [],
+    orderEventLogs: [],
+    tradingAuditLogs: [],
+    tradingAcknowledgements: [],
+    autoTradingRules: []
   };
 }

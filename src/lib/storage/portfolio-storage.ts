@@ -20,6 +20,33 @@ function normalizeState(parsed: Partial<AppState>): AppState {
       ...defaults.notificationSettings,
       ...parsed.notificationSettings
     },
+    privateTradingFlags: {
+      ...defaults.privateTradingFlags,
+      ...parsed.privateTradingFlags
+    },
+    privateTradingRiskLimits: {
+      ...defaults.privateTradingRiskLimits,
+      ...parsed.privateTradingRiskLimits,
+      allowedInstrumentKinds:
+        parsed.privateTradingRiskLimits?.allowedInstrumentKinds ??
+        defaults.privateTradingRiskLimits.allowedInstrumentKinds,
+      blockedInstrumentKinds:
+        parsed.privateTradingRiskLimits?.blockedInstrumentKinds ??
+        defaults.privateTradingRiskLimits.blockedInstrumentKinds,
+      blockedTickers:
+        parsed.privateTradingRiskLimits?.blockedTickers ??
+        defaults.privateTradingRiskLimits.blockedTickers
+    },
+    investorProfile: {
+      ...defaults.investorProfile,
+      ...parsed.investorProfile,
+      preferredAssetTypes:
+        parsed.investorProfile?.preferredAssetTypes ??
+        defaults.investorProfile.preferredAssetTypes,
+      allowedMarkets:
+        parsed.investorProfile?.allowedMarkets ??
+        defaults.investorProfile.allowedMarkets
+    },
     assets: parsed.assets ?? defaults.assets,
     snapshots: parsed.snapshots ?? defaults.snapshots,
     monthlyReports: parsed.monthlyReports ?? defaults.monthlyReports,
@@ -39,7 +66,16 @@ function normalizeState(parsed: Partial<AppState>): AppState {
       parsed.externalAssetMappings ?? defaults.externalAssetMappings,
     externalConnections:
       parsed.externalConnections ?? defaults.externalConnections,
-    externalSyncLogs: parsed.externalSyncLogs ?? defaults.externalSyncLogs
+    externalSyncLogs: parsed.externalSyncLogs ?? defaults.externalSyncLogs,
+    productUniverse: parsed.productUniverse ?? defaults.productUniverse,
+    recommendations: parsed.recommendations ?? defaults.recommendations,
+    watchlist: parsed.watchlist ?? defaults.watchlist,
+    orderProposals: parsed.orderProposals ?? defaults.orderProposals,
+    orderEventLogs: parsed.orderEventLogs ?? defaults.orderEventLogs,
+    tradingAuditLogs: parsed.tradingAuditLogs ?? defaults.tradingAuditLogs,
+    tradingAcknowledgements:
+      parsed.tradingAcknowledgements ?? defaults.tradingAcknowledgements,
+    autoTradingRules: parsed.autoTradingRules ?? defaults.autoTradingRules
   };
 }
 

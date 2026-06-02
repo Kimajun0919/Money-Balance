@@ -178,6 +178,90 @@ enum MappingSource {
   broker_metadata
 }
 
+enum TradingInstrumentKind {
+  stock
+  etf
+  fund
+  bond
+  cash
+  crypto
+  derivative
+  option
+  future
+  leveraged_etf
+  illiquid_asset
+  unknown
+}
+
+enum TradingRecommendationAction {
+  buy
+  hold
+  reduce
+  watch
+}
+
+enum TradingOrderSide {
+  buy
+  sell
+}
+
+enum TradingOrderType {
+  market
+  limit
+}
+
+enum TradingExecutionMode {
+  paper
+  sandbox
+  live
+}
+
+enum TradingOrderProposalStatus {
+  draft
+  blocked
+  proposed
+  confirmed
+  submitted
+  canceled
+}
+
+enum TradingAcknowledgementType {
+  risk_profile
+  principal_loss
+  live_trading
+  auto_trading
+}
+
+enum TradingAuditEventType {
+  investor_profile_completed
+  trading_acknowledgement_accepted
+  recommendation_generated
+  recommendation_viewed
+  order_proposal_created
+  order_proposal_confirmed
+  order_blocked
+  paper_order_submitted
+  sandbox_order_submitted
+  live_order_submitted
+  auto_trading_rule_created
+  auto_trading_rule_enabled
+  auto_trading_rule_disabled
+  auto_trade_triggered
+  kill_switch_activated
+  kill_switch_deactivated
+}
+
+enum AutoTradingRuleStatus {
+  disabled
+  enabled
+  blocked
+}
+
+enum AutoTradingStrategyType {
+  target_gap
+  watchlist_signal
+}
+
 model User {
   id                   String              @id @default(cuid())
   email                String              @unique
@@ -203,6 +287,16 @@ model User {
   external_connections ExternalConnection[]
   external_sync_logs   ExternalSyncLog[]
   external_asset_mappings ExternalAssetMapping[]
+  private_trading_setting UserPrivateTradingSetting?
+  investor_profile    InvestorProfile?
+  product_universe    ProductUniverseItem[]
+  instrument_recommendations InstrumentRecommendation[]
+  watchlist_items      WatchlistItem[]
+  order_proposals      TradingOrderProposal[]
+  order_event_logs     OrderEventLog[]
+  trading_audit_logs   TradingAuditLog[]
+  trading_acknowledgements TradingAcknowledgement[]
+  auto_trading_rules   AutoTradingRule[]
 
   @@map("users")
 }
@@ -627,6 +721,219 @@ model ExternalAssetMapping {
 
   @@unique([user_id, provider, external_asset_id])
   @@map("external_asset_mappings")
+}
+
+model UserPrivateTradingSetting {
+  id          String   @id @default(cuid())
+  user_id     String   @unique
+  user        User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  flags       Json
+  risk_limits Json
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  @@map("user_private_trading_settings")
+}
+
+model InvestorProfile {
+  id                    String   @id @default(cuid())
+  user_id               String   @unique
+  user                  User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  risk_profile_completed Boolean @default(false)
+  experience_level      String
+  investment_objective  String
+  max_loss_tolerance    Decimal  @db.Decimal(8, 6)
+  liquidity_need_months Int
+  preferred_asset_types Json
+  allowed_markets       Json
+  completed_at          DateTime?
+  updated_at            DateTime @updatedAt
+
+  @@map("investor_profiles")
+}
+
+model ProductUniverseItem {
+  id                      String                @id @default(cuid())
+  user_id                 String
+  user                    User                  @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  instrument_name         String
+  ticker                  String
+  market                  String
+  currency                String
+  instrument_kind         TradingInstrumentKind
+  asset_type              AssetType
+  expected_return         Decimal               @db.Decimal(8, 6)
+  income_yield            Decimal               @db.Decimal(8, 6)
+  risk_score              Decimal               @db.Decimal(8, 2)
+  risk_level              String
+  liquidity_level         String
+  liquidity_score         Int
+  last_price              Decimal               @db.Decimal(18, 6)
+  last_price_updated_at   DateTime
+  is_active               Boolean               @default(true)
+  is_tradable             Boolean               @default(true)
+  is_auto_trading_allowed Boolean               @default(false)
+  notes                   String
+  created_at              DateTime              @default(now())
+  updated_at              DateTime              @updatedAt
+
+  @@unique([user_id, ticker, market])
+  @@index([user_id, asset_type])
+  @@map("product_universe_items")
+}
+
+model InstrumentRecommendation {
+  id                              String                      @id @default(cuid())
+  user_id                         String
+  user                            User                        @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  instrument_id                   String
+  ticker                          String
+  instrument_name                 String
+  asset_type                      AssetType
+  action                          TradingRecommendationAction
+  score                           Decimal                     @db.Decimal(8, 2)
+  rank                            Int
+  suggested_order_amount_krw      Decimal                     @db.Decimal(18, 2)
+  allocation_gap                  Decimal                     @db.Decimal(8, 6)
+  expected_return                 Decimal                     @db.Decimal(8, 6)
+  risk_score_before               Decimal                     @db.Decimal(8, 2)
+  risk_score_after_estimate       Decimal                     @db.Decimal(8, 2)
+  reasons                         Json
+  warnings                        Json
+  blocked                         Boolean                     @default(false)
+  block_reasons                   Json
+  private_trading_flags_snapshot  Json
+  created_at                      DateTime                    @default(now())
+  viewed_at                       DateTime?
+
+  @@index([user_id, created_at])
+  @@index([instrument_id])
+  @@map("instrument_recommendations")
+}
+
+model WatchlistItem {
+  id                              String   @id @default(cuid())
+  user_id                         String
+  user                            User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  instrument_id                   String
+  ticker                          String
+  instrument_name                 String
+  priority                        String
+  note                            String
+  added_from_recommendation_id    String?
+  is_active                       Boolean  @default(true)
+  created_at                      DateTime @default(now())
+  updated_at                      DateTime @updatedAt
+
+  @@unique([user_id, instrument_id])
+  @@map("watchlist_items")
+}
+
+model TradingOrderProposal {
+  id                              String                      @id @default(cuid())
+  user_id                         String
+  user                            User                        @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  recommendation_id               String?
+  instrument_id                   String
+  ticker                          String
+  instrument_name                 String
+  side                            TradingOrderSide
+  order_type                      TradingOrderType
+  execution_mode                  TradingExecutionMode
+  amount_krw                      Decimal                     @db.Decimal(18, 2)
+  quantity                        Decimal?                    @db.Decimal(18, 6)
+  limit_price                     Decimal?                    @db.Decimal(18, 6)
+  currency                        String
+  estimated_price                 Decimal                     @db.Decimal(18, 6)
+  estimated_fees_krw              Decimal                     @db.Decimal(18, 2)
+  status                          TradingOrderProposalStatus  @default(proposed)
+  risk_check_passed               Boolean                     @default(false)
+  risk_check_messages             Json
+  user_confirmed_order            Boolean                     @default(false)
+  private_trading_flags_snapshot  Json
+  created_at                      DateTime                    @default(now())
+  confirmed_at                    DateTime?
+  submitted_at                    DateTime?
+
+  @@index([user_id, status])
+  @@index([instrument_id])
+  @@map("trading_order_proposals")
+}
+
+model OrderEventLog {
+  id                              String                @id @default(cuid())
+  user_id                         String
+  user                            User                  @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  order_proposal_id               String?
+  event_type                      String
+  execution_mode                  TradingExecutionMode
+  instrument_id                   String?
+  ticker                          String?
+  amount_krw                      Decimal?              @db.Decimal(18, 2)
+  status                          String
+  message                         String
+  private_trading_flags_snapshot  Json
+  created_at                      DateTime              @default(now())
+
+  @@index([user_id, event_type])
+  @@index([order_proposal_id])
+  @@map("order_event_logs")
+}
+
+model TradingAuditLog {
+  id                              String                @id @default(cuid())
+  user_id                         String
+  user                            User                  @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  event_type                      TradingAuditEventType
+  entity_type                     String?
+  entity_id                       String?
+  summary                         String
+  metadata                        Json
+  private_trading_flags_snapshot  Json
+  created_at                      DateTime              @default(now())
+
+  @@index([user_id, event_type])
+  @@index([entity_type, entity_id])
+  @@map("trading_audit_logs")
+}
+
+model TradingAcknowledgement {
+  id                   String                     @id @default(cuid())
+  user_id              String
+  user                 User                       @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  acknowledgement_type TradingAcknowledgementType
+  text                 String
+  accepted_at          DateTime
+
+  @@index([user_id, acknowledgement_type])
+  @@map("trading_acknowledgements")
+}
+
+model AutoTradingRule {
+  id                              String                  @id @default(cuid())
+  user_id                         String
+  user                            User                    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  name                            String
+  strategy_type                   AutoTradingStrategyType
+  instrument_id                   String
+  ticker                          String
+  instrument_name                 String
+  side                            TradingOrderSide
+  status                          AutoTradingRuleStatus   @default(disabled)
+  enabled                         Boolean                 @default(false)
+  max_order_amount_krw            Decimal                 @db.Decimal(18, 2)
+  max_daily_order_amount_krw      Decimal                 @db.Decimal(18, 2)
+  max_orders_per_day              Int
+  minimum_cash_ratio_after_trade  Decimal                 @db.Decimal(8, 6)
+  max_risk_score_after_trade      Decimal                 @db.Decimal(8, 2)
+  private_trading_flags_snapshot  Json
+  created_at                      DateTime                @default(now())
+  updated_at                      DateTime                @updatedAt
+  last_triggered_at               DateTime?
+
+  @@index([user_id, status])
+  @@index([instrument_id])
+  @@map("auto_trading_rules")
 }
 
 model AssetTypeSetting {
