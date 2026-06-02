@@ -148,6 +148,14 @@ export function RebalancingDashboard() {
               최근 계획
             </Link>
           ) : null}
+          {data.latestPlan ? (
+            <Link
+              href={`/rebalancing/execute/${data.latestPlan.id}`}
+              className="inline-flex h-10 items-center rounded-md border border-line px-4 text-sm font-semibold text-neutral-700"
+            >
+              실행 검토
+            </Link>
+          ) : null}
         </div>
         {message ? (
           <p className="mt-4 rounded-md border border-line bg-neutral-50 px-3 py-2 text-sm text-neutral-700">

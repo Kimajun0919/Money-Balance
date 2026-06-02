@@ -67,6 +67,23 @@ function normalizeState(parsed: Partial<AppState>): AppState {
     externalConnections:
       parsed.externalConnections ?? defaults.externalConnections,
     externalSyncLogs: parsed.externalSyncLogs ?? defaults.externalSyncLogs,
+    financialInstitutions:
+      parsed.financialInstitutions ?? defaults.financialInstitutions,
+    financialAccounts: parsed.financialAccounts ?? defaults.financialAccounts,
+    financialAccountAssetLinks:
+      parsed.financialAccountAssetLinks ?? defaults.financialAccountAssetLinks,
+    accountSyncJobs: parsed.accountSyncJobs ?? defaults.accountSyncJobs,
+    accountSyncItems: parsed.accountSyncItems ?? defaults.accountSyncItems,
+    liabilities: parsed.liabilities ?? defaults.liabilities,
+    netWorthSnapshots:
+      parsed.netWorthSnapshots ?? defaults.netWorthSnapshots,
+    accountAuditLogs: parsed.accountAuditLogs ?? defaults.accountAuditLogs,
+    realRebalancingOrderBatches:
+      parsed.realRebalancingOrderBatches ??
+      defaults.realRebalancingOrderBatches,
+    realRebalancingOrderResults:
+      parsed.realRebalancingOrderResults ??
+      defaults.realRebalancingOrderResults,
     productUniverse: parsed.productUniverse ?? defaults.productUniverse,
     recommendations: parsed.recommendations ?? defaults.recommendations,
     watchlist: parsed.watchlist ?? defaults.watchlist,

@@ -56,6 +56,18 @@ const navGroups = [
         description: "보유 자산과 계좌, 배당 정보를 등록하고 수정합니다."
       },
       {
+        href: "/accounts",
+        label: "계좌 통합",
+        icon: WalletCards,
+        description: "연결 계좌와 수동 계좌를 합쳐 전체 금융 현황을 확인합니다."
+      },
+      {
+        href: "/net-worth",
+        label: "순자산",
+        icon: PieChart,
+        description: "총자산, 총부채, 순자산과 월별 스냅샷을 관리합니다."
+      },
+      {
         href: "/target-portfolio",
         label: "목표 포트폴리오",
         icon: PieChart,
@@ -184,6 +196,18 @@ const navGroups = [
         label: "가져오기 이력",
         icon: History,
         description: "가져오기 작업의 결과, 오류, 처리 내역을 확인합니다."
+      },
+      {
+        href: "/connections",
+        label: "연결 센터",
+        icon: Plug,
+        description: "은행, 증권, 수동, CSV, 비활성 공식 어댑터 연결 상태를 한곳에서 확인합니다."
+      },
+      {
+        href: "/connections/sync",
+        label: "계좌 동기화",
+        icon: RefreshCw,
+        description: "계좌 동기화 결과를 미리보고 반영합니다."
       },
       {
         href: "/connections/broker",

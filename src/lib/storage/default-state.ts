@@ -3,7 +3,10 @@ import { calculateRiskScoreLimit } from "@/lib/engines/risk-score-engine";
 import type {
   AppState,
   Asset,
+  FinancialAccount,
+  FinancialInstitution,
   InvestorProfile,
+  Liability,
   PrivateTradingFlags,
   PrivateTradingRiskLimits,
   ProductUniverseItem,
@@ -385,6 +388,224 @@ export function createSampleAssets(): Asset[] {
   ];
 }
 
+export function createDefaultFinancialInstitutions(): FinancialInstitution[] {
+  const now = new Date().toISOString();
+
+  return [
+    {
+      id: "institution_mock_bank",
+      name: "mock-bank",
+      displayName: "모의 은행",
+      institutionType: "bank",
+      countryCode: "KR",
+      providerType: "bank",
+      providerId: "mock-bank",
+      isActive: true,
+      createdAt: now,
+      updatedAt: now
+    },
+    {
+      id: "institution_mock_securities",
+      name: "mock-securities",
+      displayName: "모의 증권",
+      institutionType: "securities",
+      countryCode: "KR",
+      providerType: "securities",
+      providerId: "mock-securities",
+      isActive: true,
+      createdAt: now,
+      updatedAt: now
+    }
+  ];
+}
+
+export function createDefaultFinancialAccounts(): FinancialAccount[] {
+  const now = new Date().toISOString();
+
+  return [
+    {
+      id: "account_mock_checking",
+      institutionId: "institution_mock_bank",
+      externalAccountIdHash: "mock_bank_checking_hash",
+      accountAlias: "생활비 입출금",
+      accountType: "bank_checking",
+      currency: "KRW",
+      balance: 2_000_000,
+      valuationAmountKrw: 2_000_000,
+      isLiability: false,
+      isManual: false,
+      valuationSource: "external_balance",
+      syncSource: "bank",
+      lastSyncedAt: now,
+      lastSuccessfulSyncAt: now,
+      syncStatus: "synced",
+      staleStatus: "fresh",
+      warningCodes: [],
+      isArchived: false,
+      createdAt: now,
+      updatedAt: now
+    },
+    {
+      id: "account_mock_savings",
+      institutionId: "institution_mock_bank",
+      externalAccountIdHash: "mock_bank_savings_hash",
+      accountAlias: "비상금 예금",
+      accountType: "bank_savings",
+      currency: "KRW",
+      balance: 8_000_000,
+      principalAmount: 8_000_000,
+      valuationAmountKrw: 8_000_000,
+      isLiability: false,
+      isManual: false,
+      valuationSource: "external_balance",
+      syncSource: "bank",
+      lastSyncedAt: now,
+      lastSuccessfulSyncAt: now,
+      syncStatus: "synced",
+      staleStatus: "fresh",
+      warningCodes: [],
+      isArchived: false,
+      createdAt: now,
+      updatedAt: now
+    },
+    {
+      id: "account_mock_installment",
+      institutionId: "institution_mock_bank",
+      externalAccountIdHash: "mock_bank_installment_hash",
+      accountAlias: "정기 적금",
+      accountType: "installment_savings",
+      currency: "KRW",
+      balance: 3_000_000,
+      principalAmount: 3_000_000,
+      valuationAmountKrw: 3_000_000,
+      isLiability: false,
+      isManual: false,
+      valuationSource: "external_balance",
+      syncSource: "bank",
+      lastSyncedAt: now,
+      lastSuccessfulSyncAt: now,
+      syncStatus: "synced",
+      staleStatus: "fresh",
+      warningCodes: [],
+      isArchived: false,
+      createdAt: now,
+      updatedAt: now
+    },
+    {
+      id: "account_mock_securities_cash",
+      institutionId: "institution_mock_securities",
+      externalAccountIdHash: "mock_securities_cash_hash",
+      accountAlias: "모의 종합계좌 예수금",
+      accountType: "securities_cash",
+      currency: "KRW",
+      balance: 1_500_000,
+      valuationAmountKrw: 1_500_000,
+      isLiability: false,
+      isManual: false,
+      valuationSource: "external_balance",
+      syncSource: "securities",
+      lastSyncedAt: now,
+      lastSuccessfulSyncAt: now,
+      syncStatus: "synced",
+      staleStatus: "fresh",
+      warningCodes: [],
+      isArchived: false,
+      createdAt: now,
+      updatedAt: now
+    },
+    {
+      id: "account_mock_domestic_stock",
+      institutionId: "institution_mock_securities",
+      externalAccountIdHash: "mock_securities_krx_hash",
+      accountAlias: "국내주식 평가금",
+      accountType: "domestic_stock",
+      currency: "KRW",
+      balance: 4_000_000,
+      valuationAmountKrw: 4_000_000,
+      isLiability: false,
+      isManual: false,
+      valuationSource: "market_price",
+      syncSource: "securities",
+      lastSyncedAt: now,
+      lastSuccessfulSyncAt: now,
+      syncStatus: "synced",
+      staleStatus: "fresh",
+      warningCodes: [],
+      isArchived: false,
+      createdAt: now,
+      updatedAt: now
+    },
+    {
+      id: "account_mock_overseas_etf",
+      institutionId: "institution_mock_securities",
+      externalAccountIdHash: "mock_securities_spy_hash",
+      accountAlias: "해외 ETF 평가금",
+      accountType: "etf",
+      currency: "USD",
+      balance: 5_200,
+      valuationAmountKrw: 7_020_000,
+      isLiability: false,
+      isManual: false,
+      valuationSource: "mixed",
+      syncSource: "securities",
+      lastSyncedAt: now,
+      lastSuccessfulSyncAt: now,
+      syncStatus: "synced",
+      staleStatus: "fresh",
+      warningCodes: [],
+      isArchived: false,
+      createdAt: now,
+      updatedAt: now
+    },
+    {
+      id: "account_mock_loan",
+      institutionId: "institution_mock_bank",
+      externalAccountIdHash: "mock_bank_loan_hash",
+      accountAlias: "모의 신용대출",
+      accountType: "loan",
+      currency: "KRW",
+      balance: -2_000_000,
+      principalAmount: 2_000_000,
+      valuationAmountKrw: 0,
+      liabilityAmountKrw: 2_000_000,
+      isLiability: true,
+      isManual: false,
+      valuationSource: "external_balance",
+      syncSource: "bank",
+      lastSyncedAt: now,
+      lastSuccessfulSyncAt: now,
+      syncStatus: "synced",
+      staleStatus: "fresh",
+      warningCodes: [],
+      isArchived: false,
+      createdAt: now,
+      updatedAt: now
+    }
+  ];
+}
+
+export function createDefaultLiabilities(): Liability[] {
+  const now = new Date().toISOString();
+
+  return [
+    {
+      id: "liability_mock_loan",
+      financialAccountId: "account_mock_loan",
+      name: "모의 신용대출",
+      liabilityType: "credit_loan",
+      currency: "KRW",
+      principalAmount: 2_000_000,
+      currentBalance: 2_000_000,
+      interestRate: 0.052,
+      paymentDay: 25,
+      valuationAmountKrw: 2_000_000,
+      isManual: false,
+      createdAt: now,
+      updatedAt: now
+    }
+  ];
+}
+
 export function createDefaultState(): AppState {
   return {
     profile: DEFAULT_PROFILE,
@@ -404,6 +625,16 @@ export function createDefaultState(): AppState {
     externalAssetMappings: [],
     externalConnections: [],
     externalSyncLogs: [],
+    financialInstitutions: createDefaultFinancialInstitutions(),
+    financialAccounts: createDefaultFinancialAccounts(),
+    financialAccountAssetLinks: [],
+    accountSyncJobs: [],
+    accountSyncItems: [],
+    liabilities: createDefaultLiabilities(),
+    netWorthSnapshots: [],
+    accountAuditLogs: [],
+    realRebalancingOrderBatches: [],
+    realRebalancingOrderResults: [],
     privateTradingFlags: createDefaultPrivateTradingFlags(),
     privateTradingRiskLimits: createDefaultPrivateTradingRiskLimits(),
     investorProfile: createDefaultInvestorProfile(),

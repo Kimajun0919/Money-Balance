@@ -97,7 +97,16 @@ export type ValuationSource =
   | "broker_sync"
   | "market_price"
   | "mixed";
-export type ExternalProviderType = "market_data" | "fx_rate" | "broker";
+export type ExternalProviderType =
+  | "market_data"
+  | "fx_rate"
+  | "broker"
+  | "bank"
+  | "securities"
+  | "manual"
+  | "csv_import"
+  | "open_banking"
+  | "mydata";
 export type ExternalConnectionStatus =
   | "connected"
   | "disconnected"
@@ -228,6 +237,11 @@ export type RebalancingExecutionMode =
   | "sandbox"
   | "live_manual"
   | "live_auto";
+export type RealRebalancingExecutionMode =
+  | "simulation"
+  | "sandbox"
+  | "manual_real_order"
+  | "real_order_api";
 export type RebalancingExecutionStatus =
   | "pending"
   | "running"
@@ -1279,6 +1293,298 @@ export interface DataFreshnessWarning {
   message: string;
 }
 
+export type FinancialInstitutionType =
+  | "bank"
+  | "securities"
+  | "broker"
+  | "manual"
+  | "csv"
+  | "open_banking"
+  | "mydata"
+  | "market_data"
+  | "fx_rate"
+  | "other";
+
+export type FinancialAccountType =
+  | "bank_checking"
+  | "bank_savings"
+  | "installment_savings"
+  | "cash"
+  | "securities_cash"
+  | "securities"
+  | "domestic_stock"
+  | "overseas_stock"
+  | "etf"
+  | "bond"
+  | "pension"
+  | "loan"
+  | "other_asset"
+  | "other_liability";
+
+export type FinancialAccountSyncStatus =
+  | "never_synced"
+  | "synced"
+  | "syncing"
+  | "failed"
+  | "deleted";
+
+export type FinancialAccountStaleStatus = "fresh" | "stale" | "manual" | "unknown";
+
+export type FinancialAccountValuationSource =
+  | "manual"
+  | "external_balance"
+  | "market_price"
+  | "fx_rate"
+  | "mixed";
+
+export type AccountSyncJobStatus =
+  | "previewed"
+  | "applied"
+  | "success"
+  | "partial_success"
+  | "failed";
+
+export type AccountSyncItemType = "account" | "asset" | "liability";
+export type AccountSyncItemAction =
+  | "create"
+  | "update"
+  | "skip"
+  | "duplicate"
+  | "delete";
+export type AccountSyncItemStatus = "success" | "warning" | "failed" | "skipped";
+
+export type LiabilityType =
+  | "credit_loan"
+  | "mortgage"
+  | "margin_loan"
+  | "card_debt"
+  | "other";
+
+export type AccountAuditEventType =
+  | "connection_created"
+  | "connection_disconnected"
+  | "token_updated"
+  | "sync_previewed"
+  | "sync_applied"
+  | "synced_data_deleted"
+  | "manual_account_created"
+  | "manual_account_updated"
+  | "account_archived"
+  | "real_rebalancing_plan_created"
+  | "real_order_proposal_created"
+  | "real_order_confirmation_attempted"
+  | "real_order_submitted"
+  | "real_order_failed"
+  | "stop_switch_changed";
+
+export type RealRebalancingOrderBatchStatus =
+  | "draft"
+  | "blocked"
+  | "pending_confirmation"
+  | "submitted"
+  | "completed"
+  | "partially_failed"
+  | "failed";
+
+export type RealRebalancingOrderResultStatus =
+  | "blocked"
+  | "submitted"
+  | "completed"
+  | "failed"
+  | "simulated";
+
+export interface FinancialInstitution {
+  id: string;
+  name: string;
+  displayName: string;
+  institutionType: FinancialInstitutionType;
+  countryCode: string;
+  providerType: ExternalProviderType;
+  providerId: string;
+  logoUrl?: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FinancialAccount {
+  id: string;
+  userId?: string;
+  institutionId?: string;
+  externalConnectionId?: string;
+  externalAccountIdHash?: string;
+  accountAlias: string;
+  accountType: FinancialAccountType;
+  accountSubtype?: string;
+  currency: string;
+  balance: number;
+  principalAmount?: number;
+  valuationAmountKrw: number;
+  liabilityAmountKrw?: number;
+  isLiability: boolean;
+  isManual: boolean;
+  valuationSource: FinancialAccountValuationSource;
+  syncSource: ExternalProviderType | "manual";
+  lastSyncedAt?: string;
+  lastSuccessfulSyncAt?: string;
+  lastFailedSyncAt?: string;
+  syncStatus: FinancialAccountSyncStatus;
+  staleStatus: FinancialAccountStaleStatus;
+  warningCodes: string[];
+  isArchived: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FinancialAccountAssetLink {
+  id: string;
+  financialAccountId: string;
+  assetId: string;
+  linkType: "holding" | "cash" | "manual" | "inferred";
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AccountSyncJob {
+  id: string;
+  externalConnectionId?: string;
+  providerType: ExternalProviderType;
+  syncType: "preview" | "apply" | "delete" | "disconnect";
+  status: AccountSyncJobStatus;
+  startedAt: string;
+  completedAt?: string;
+  accountCount: number;
+  assetCount: number;
+  createdCount: number;
+  updatedCount: number;
+  skippedCount: number;
+  duplicateCount: number;
+  warningCount: number;
+  errorCount: number;
+  errorMessage?: string;
+  rawResponseSnapshot?: Record<string, unknown>;
+  createdAt: string;
+}
+
+export interface AccountSyncItem {
+  id: string;
+  accountSyncJobId: string;
+  externalAccountIdHash?: string;
+  externalAssetIdHash?: string;
+  itemType: AccountSyncItemType;
+  action: AccountSyncItemAction;
+  status: AccountSyncItemStatus;
+  normalizedPayload: Record<string, unknown>;
+  warningCodes: string[];
+  errorMessage?: string;
+  createdAccountId?: string;
+  createdAssetId?: string;
+  updatedAccountId?: string;
+  updatedAssetId?: string;
+  createdAt: string;
+}
+
+export interface Liability {
+  id: string;
+  financialAccountId?: string;
+  name: string;
+  liabilityType: LiabilityType;
+  currency: string;
+  principalAmount: number;
+  currentBalance: number;
+  interestRate?: number;
+  paymentDay?: number;
+  maturityDate?: string;
+  valuationAmountKrw: number;
+  isManual: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface NetWorthSnapshot {
+  id: string;
+  referenceMonth: string;
+  totalAssetsKrw: number;
+  totalLiabilitiesKrw: number;
+  netWorthKrw: number;
+  cashKrw: number;
+  depositsKrw: number;
+  investmentsKrw: number;
+  pensionKrw: number;
+  otherAssetsKrw: number;
+  accountCount: number;
+  institutionCount: number;
+  staleWarningCount: number;
+  createdAt: string;
+}
+
+export interface AccountAuditLog {
+  id: string;
+  eventType: AccountAuditEventType;
+  entityType?: string;
+  entityId?: string;
+  summary: string;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+}
+
+export interface RealRebalancingOrderBatch {
+  id: string;
+  rebalancingPlanId: string;
+  tradingOrderProposalIds: string[];
+  executionMode: RealRebalancingExecutionMode;
+  status: RealRebalancingOrderBatchStatus;
+  confirmationTextRequired: string;
+  confirmationTextEntered?: string;
+  submittedAt?: string;
+  completedAt?: string;
+  failedAt?: string;
+  errorMessage?: string;
+  totalOrderAmountKrw: number;
+  buyOrderCount: number;
+  sellOrderCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RealRebalancingOrderResult {
+  id: string;
+  realRebalancingOrderBatchId: string;
+  tradingOrderProposalId: string;
+  providerOrderId?: string;
+  ticker: string;
+  market: string;
+  side: TradingOrderSide;
+  orderType: TradingOrderType;
+  quantity?: number;
+  limitPrice?: number;
+  estimatedAmountKrw: number;
+  status: RealRebalancingOrderResultStatus;
+  submittedAt?: string;
+  completedAt?: string;
+  failedAt?: string;
+  errorMessage?: string;
+  rawResponseSnapshot?: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface NetWorthSummary {
+  totalAssetsKrw: number;
+  totalLiabilitiesKrw: number;
+  netWorthKrw: number;
+  liquidCashKrw: number;
+  investmentAssetsKrw: number;
+  depositAssetsKrw: number;
+  pensionAssetsKrw: number;
+  otherAssetsKrw: number;
+  accountCount: number;
+  institutionCount: number;
+  currencyExposure: Record<string, number>;
+  assetClassExposure: Record<string, number>;
+  valuationSourceBreakdown: Record<string, number>;
+}
+
 export interface AppState {
   profile: UserProfile;
   assets: Asset[];
@@ -1297,6 +1603,16 @@ export interface AppState {
   externalAssetMappings: ExternalAssetMapping[];
   externalConnections: ExternalConnection[];
   externalSyncLogs: ExternalSyncLog[];
+  financialInstitutions: FinancialInstitution[];
+  financialAccounts: FinancialAccount[];
+  financialAccountAssetLinks: FinancialAccountAssetLink[];
+  accountSyncJobs: AccountSyncJob[];
+  accountSyncItems: AccountSyncItem[];
+  liabilities: Liability[];
+  netWorthSnapshots: NetWorthSnapshot[];
+  accountAuditLogs: AccountAuditLog[];
+  realRebalancingOrderBatches: RealRebalancingOrderBatch[];
+  realRebalancingOrderResults: RealRebalancingOrderResult[];
   privateTradingFlags: PrivateTradingFlags;
   privateTradingRiskLimits: PrivateTradingRiskLimits;
   investorProfile: InvestorProfile;
