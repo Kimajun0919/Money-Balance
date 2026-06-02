@@ -45,12 +45,17 @@ const navItems = [
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const activeHref = navItems
+    .filter(
+      (item) => pathname === item.href || pathname.startsWith(`${item.href}/`)
+    )
+    .sort((a, b) => b.href.length - a.href.length)[0]?.href;
 
   return (
-    <div className="min-h-screen">
-      <header className="border-b border-line bg-white/85 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
-          <Link href="/dashboard" className="flex items-center gap-3">
+    <div className="min-h-screen md:flex">
+      <aside className="border-b border-line bg-white/90 backdrop-blur md:sticky md:top-0 md:h-screen md:w-72 md:shrink-0 md:border-b-0 md:border-r">
+        <div className="flex h-full flex-col gap-4 px-4 py-4">
+          <Link href="/dashboard" className="flex shrink-0 items-center gap-3">
             <span className="flex h-10 w-10 items-center justify-center rounded-md bg-mint text-white">
               <BarChart3 size={22} aria-hidden="true" />
             </span>
@@ -63,15 +68,19 @@ export function AppShell({ children }: { children: ReactNode }) {
               </span>
             </span>
           </Link>
-          <nav className="flex gap-2 overflow-x-auto pb-1 lg:pb-0">
+
+          <nav
+            aria-label="주요 메뉴"
+            className="flex gap-2 overflow-x-auto pb-1 md:min-h-0 md:flex-1 md:flex-col md:gap-1 md:overflow-y-auto md:overflow-x-hidden md:pb-0 md:pr-1"
+          >
             {navItems.map((item) => {
               const Icon = item.icon;
-              const active = pathname === item.href;
+              const active = activeHref === item.href;
               return (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`flex h-10 shrink-0 items-center gap-2 rounded-md border px-3 text-sm font-medium transition ${
+                  className={`flex h-10 shrink-0 items-center gap-2 rounded-md border px-3 text-sm font-medium transition md:w-full ${
                     active
                       ? "border-mint bg-mint text-white"
                       : "border-line bg-white text-neutral-700 hover:border-mint hover:text-mint"
@@ -84,9 +93,10 @@ export function AppShell({ children }: { children: ReactNode }) {
             })}
           </nav>
         </div>
-      </header>
-      <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:py-8">
-        {children}
+      </aside>
+
+      <main className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8 xl:px-10">
+        <div className="mx-auto w-full max-w-7xl">{children}</div>
       </main>
     </div>
   );
