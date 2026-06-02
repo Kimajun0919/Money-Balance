@@ -10,6 +10,10 @@ import {
   KIS_BROKER_NAME,
   KIS_BROKER_PROVIDER_NAME
 } from "@/lib/providers/broker/broker-provider-constants";
+import type {
+  TradingOrderSide,
+  TradingOrderType
+} from "@/lib/types";
 
 type KisEnv = "real" | "demo";
 
@@ -34,6 +38,38 @@ interface KisConfigOverrides {
 
 export interface KoreaInvestmentBrokerProviderOptions {
   accountAlias?: string;
+}
+
+export interface KisOrderInput {
+  proposalId?: string;
+  ticker: string;
+  market?: string;
+  currency: string;
+  side: TradingOrderSide;
+  orderType: TradingOrderType;
+  amountKrw?: number;
+  quantity?: number;
+  limitPrice?: number;
+  estimatedPrice?: number;
+  userConfirmedOrder: boolean;
+  confirmationText: string;
+}
+
+export interface KisOrderResult {
+  providerName: string;
+  brokerName: string;
+  proposalId?: string;
+  orderId?: string;
+  orderTime?: string;
+  trId: string;
+  market: string;
+  ticker: string;
+  side: TradingOrderSide;
+  orderType: TradingOrderType;
+  quantity: number;
+  orderPrice: number;
+  currency: string;
+  rawData: Record<string, unknown>;
 }
 
 interface KisTokenCache {
@@ -61,6 +97,10 @@ function envValue(name: string) {
 function parseBoolean(value: string, fallback = false) {
   if (!value) return fallback;
   return ["1", "true", "yes", "y"].includes(value.toLowerCase());
+}
+
+function envBoolean(name: string, fallback = false) {
+  return parseBoolean(envValue(name), fallback);
 }
 
 function parseCsv(value: string, fallback: string[]) {
@@ -194,6 +234,11 @@ function firstNumber(
   return undefined;
 }
 
+function positiveNumber(value: unknown): number | undefined {
+  const parsed = toNumber(value);
+  return parsed !== undefined && parsed > 0 ? parsed : undefined;
+}
+
 function parseExpiryMs(value: unknown) {
   const fallback = Date.now() + 23 * 60 * 60 * 1000;
   if (typeof value !== "string") return fallback;
@@ -232,6 +277,139 @@ function exchangeRateFor(
     firstNumber(row, ["bass_exrt", "frst_bltn_exrt", "aply_exrt"]) ??
     config.defaultExchangeRates[currency]
   );
+}
+
+function orderExchangeRate(currency: string) {
+  if (currency === "KRW") return 1;
+  return (
+    positiveNumber(envValue(`KIS_ORDER_${currency}_KRW_RATE`)) ??
+    positiveNumber(envValue(`KIS_DEFAULT_${currency}_KRW_RATE`))
+  );
+}
+
+function normalizeTicker(value: string) {
+  return value.trim().toUpperCase();
+}
+
+function normalizeOrderMarket(value?: string) {
+  return value?.trim().toUpperCase();
+}
+
+function isDomesticOrderMarket(input: KisOrderInput) {
+  const market = normalizeOrderMarket(input.market);
+  return input.currency.toUpperCase() === "KRW" && (!market || market === "KRX");
+}
+
+function kisOverseasExchangeCode(market?: string) {
+  const code = normalizeOrderMarket(market);
+  if (code === "NASDAQ") return "NASD";
+  if (code === "NASD") return "NASD";
+  if (code === "NYS") return "NYSE";
+  if (code === "NYSE") return "NYSE";
+  if (code === "AMEX") return "AMEX";
+  if (code === "HKEX") return "SEHK";
+  if (code === "SEHK") return "SEHK";
+  if (code === "SHAA") return "SHAA";
+  if (code === "SZAA") return "SZAA";
+  if (code === "TKSE") return "TKSE";
+  if (code === "HASE") return "HASE";
+  if (code === "VNSE") return "VNSE";
+  return undefined;
+}
+
+function realOverseasOrderTrId(exchangeCode: string, side: TradingOrderSide) {
+  const buy: Record<string, string> = {
+    NASD: "TTTT1002U",
+    NYSE: "TTTT1002U",
+    AMEX: "TTTT1002U",
+    SEHK: "TTTS1002U",
+    SHAA: "TTTS0202U",
+    SZAA: "TTTS0305U",
+    TKSE: "TTTS0308U",
+    HASE: "TTTS0311U",
+    VNSE: "TTTS0311U"
+  };
+  const sell: Record<string, string> = {
+    NASD: "TTTT1006U",
+    NYSE: "TTTT1006U",
+    AMEX: "TTTT1006U",
+    SEHK: "TTTS1001U",
+    SHAA: "TTTS1005U",
+    SZAA: "TTTS0304U",
+    TKSE: "TTTS0307U",
+    HASE: "TTTS0310U",
+    VNSE: "TTTS0310U"
+  };
+  return side === "buy" ? buy[exchangeCode] : sell[exchangeCode];
+}
+
+function orderTrIdForEnv(config: KisConfig, realTrId: string) {
+  return config.env === "demo" ? `V${realTrId.slice(1)}` : realTrId;
+}
+
+function domesticOrderTrId(config: KisConfig, side: TradingOrderSide) {
+  const realTrId = side === "buy" ? "TTTC0012U" : "TTTC0011U";
+  return orderTrIdForEnv(config, realTrId);
+}
+
+function formatOrderNumber(value: number) {
+  if (Number.isInteger(value)) return String(value);
+  return value.toFixed(4).replace(/0+$/, "").replace(/\.$/, "");
+}
+
+function resolveOrderPrice(input: KisOrderInput) {
+  const price = positiveNumber(input.limitPrice) ?? positiveNumber(input.estimatedPrice);
+  if (!price) {
+    throw new Error("KIS 주문 가격을 계산할 수 없습니다.");
+  }
+  return price;
+}
+
+function resolveOrderQuantity(input: KisOrderInput, orderPrice: number) {
+  const explicitQuantity = positiveNumber(input.quantity);
+  if (explicitQuantity) return Math.floor(explicitQuantity);
+
+  const amountKrw = positiveNumber(input.amountKrw);
+  if (!amountKrw) {
+    throw new Error("KIS 주문 수량 계산에 필요한 주문 금액이 없습니다.");
+  }
+
+  const currency = input.currency.toUpperCase();
+  const fxRate = orderExchangeRate(currency);
+  if (!fxRate) {
+    throw new Error(
+      `${currency} 주문 수량 계산에 필요한 환율이 없습니다. KIS_ORDER_${currency}_KRW_RATE 또는 KIS_DEFAULT_${currency}_KRW_RATE를 설정하세요.`
+    );
+  }
+
+  const quantity = Math.floor(amountKrw / (orderPrice * fxRate));
+  if (quantity <= 0) {
+    throw new Error("KIS 주문 수량이 1주 미만입니다.");
+  }
+  return quantity;
+}
+
+function validateKisOrderInput(config: KisConfig, input: KisOrderInput) {
+  const expectedConfirmation =
+    envValue("KIS_ORDER_CONFIRMATION_TEXT") || "KIS_REAL_ORDER_EXECUTE";
+  if (!envBoolean("KIS_ENABLE_ORDER_API")) {
+    throw new Error("KIS 주문 API가 비활성화되어 있습니다. KIS_ENABLE_ORDER_API=true 설정이 필요합니다.");
+  }
+  if (config.env === "real" && !envBoolean("KIS_ENABLE_REAL_ORDER_API")) {
+    throw new Error("실전 KIS 주문 API가 비활성화되어 있습니다. KIS_ENABLE_REAL_ORDER_API=true 설정이 필요합니다.");
+  }
+  if (input.side === "sell" && !envBoolean("KIS_ENABLE_SELL_ORDER_API")) {
+    throw new Error("KIS 매도 주문 API가 비활성화되어 있습니다. KIS_ENABLE_SELL_ORDER_API=true 설정이 필요합니다.");
+  }
+  if (!input.userConfirmedOrder) {
+    throw new Error("사용자 최종 주문 확인이 필요합니다.");
+  }
+  if (input.confirmationText !== expectedConfirmation) {
+    throw new Error("KIS 실주문 최종 확인 문구가 일치하지 않습니다.");
+  }
+  if (input.orderType !== "limit") {
+    throw new Error("KIS 실주문은 현재 지정가 주문만 허용합니다.");
+  }
 }
 
 function hasPositivePosition(quantity?: number, valuationAmount?: number) {
@@ -351,6 +529,13 @@ async function parseJsonResponse(response: Response) {
   }
 }
 
+function outputRecord(body: Record<string, unknown>) {
+  const output = body.output;
+  if (isRecord(output)) return output;
+  if (Array.isArray(output) && isRecord(output[0])) return output[0];
+  return {};
+}
+
 export class KoreaInvestmentBrokerProvider implements BrokerProvider {
   readonly providerName = KIS_BROKER_PROVIDER_NAME;
   readonly brokerName = KIS_BROKER_NAME;
@@ -440,6 +625,22 @@ export class KoreaInvestmentBrokerProvider implements BrokerProvider {
     return undefined;
   }
 
+  async submitOrder(input: KisOrderInput): Promise<KisOrderResult> {
+    const config = loadKisConfig(this.options);
+    validateKisOrderInput(config, input);
+
+    const ticker = normalizeTicker(input.ticker);
+    if (!ticker) {
+      throw new Error("KIS 주문 종목코드가 필요합니다.");
+    }
+
+    const orderPrice = resolveOrderPrice(input);
+    const quantity = resolveOrderQuantity(input, orderPrice);
+    return isDomesticOrderMarket(input)
+      ? this.submitDomesticOrder(config, input, ticker, quantity, orderPrice)
+      : this.submitOverseasOrder(config, input, ticker, quantity, orderPrice);
+  }
+
   private async getAccessToken(config: KisConfig) {
     const cacheKey = getCacheKey(config);
     const now = Date.now();
@@ -523,6 +724,146 @@ export class KoreaInvestmentBrokerProvider implements BrokerProvider {
     return {
       body,
       trCont: (response.headers.get("tr_cont") ?? "").trim()
+    };
+  }
+
+  private async postKisJson(
+    config: KisConfig,
+    apiUrl: string,
+    trId: string,
+    params: Record<string, string>
+  ): Promise<KisFetchResult> {
+    const token = await this.getAccessToken(config);
+    const response = await fetch(`${config.baseUrl}${apiUrl}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "text/plain",
+        charset: "UTF-8",
+        "User-Agent": config.userAgent,
+        authorization: `Bearer ${token}`,
+        appkey: config.appKey,
+        appsecret: config.appSecret,
+        tr_id: trId,
+        custtype: "P",
+        tr_cont: ""
+      },
+      body: JSON.stringify(params)
+    });
+    const body = await parseJsonResponse(response);
+
+    if (!response.ok || body.rt_cd !== "0") {
+      throw new Error(
+        `한국투자증권 주문 API 호출 실패(${trId}): ${
+          toStringValue(body.msg1) ?? response.status
+        }`
+      );
+    }
+
+    return {
+      body,
+      trCont: (response.headers.get("tr_cont") ?? "").trim()
+    };
+  }
+
+  private async submitDomesticOrder(
+    config: KisConfig,
+    input: KisOrderInput,
+    ticker: string,
+    quantity: number,
+    orderPrice: number
+  ): Promise<KisOrderResult> {
+    const trId = domesticOrderTrId(config, input.side);
+    const result = await this.postKisJson(
+      config,
+      "/uapi/domestic-stock/v1/trading/order-cash",
+      trId,
+      {
+        CANO: config.accountNumber,
+        ACNT_PRDT_CD: config.accountProductCode,
+        PDNO: ticker,
+        ORD_DVSN: "00",
+        ORD_QTY: String(quantity),
+        ORD_UNPR: formatOrderNumber(orderPrice),
+        EXCG_ID_DVSN_CD: envValue("KIS_DOMESTIC_ORDER_EXCHANGE") || "KRX",
+        SLL_TYPE:
+          input.side === "sell"
+            ? envValue("KIS_DOMESTIC_SELL_TYPE") || "01"
+            : "",
+        CNDT_PRIC: ""
+      }
+    );
+    const output = outputRecord(result.body);
+
+    return {
+      providerName: this.providerName,
+      brokerName: this.brokerName,
+      proposalId: input.proposalId,
+      orderId: firstString(output, ["ODNO"]),
+      orderTime: firstString(output, ["ORD_TMD"]),
+      trId,
+      market: "KRX",
+      ticker,
+      side: input.side,
+      orderType: input.orderType,
+      quantity,
+      orderPrice,
+      currency: "KRW",
+      rawData: result.body
+    };
+  }
+
+  private async submitOverseasOrder(
+    config: KisConfig,
+    input: KisOrderInput,
+    ticker: string,
+    quantity: number,
+    orderPrice: number
+  ): Promise<KisOrderResult> {
+    const exchangeCode = kisOverseasExchangeCode(input.market);
+    if (!exchangeCode) {
+      throw new Error("지원하지 않는 KIS 해외주식 거래소 코드입니다.");
+    }
+    const realTrId = realOverseasOrderTrId(exchangeCode, input.side);
+    if (!realTrId) {
+      throw new Error("지원하지 않는 KIS 해외주식 주문 구분입니다.");
+    }
+    const trId = orderTrIdForEnv(config, realTrId);
+    const result = await this.postKisJson(
+      config,
+      "/uapi/overseas-stock/v1/trading/order",
+      trId,
+      {
+        CANO: config.accountNumber,
+        ACNT_PRDT_CD: config.accountProductCode,
+        OVRS_EXCG_CD: exchangeCode,
+        PDNO: ticker,
+        ORD_QTY: String(quantity),
+        OVRS_ORD_UNPR: formatOrderNumber(orderPrice),
+        CTAC_TLNO: envValue("KIS_OVERSEAS_ORDER_CONTACT_TEL"),
+        MGCO_APTM_ODNO: envValue("KIS_OVERSEAS_ORDER_MGCO_ODNO"),
+        SLL_TYPE: input.side === "sell" ? "00" : "",
+        ORD_SVR_DVSN_CD: envValue("KIS_OVERSEAS_ORDER_SERVER_CODE") || "0",
+        ORD_DVSN: "00"
+      }
+    );
+    const output = outputRecord(result.body);
+
+    return {
+      providerName: this.providerName,
+      brokerName: this.brokerName,
+      proposalId: input.proposalId,
+      orderId: firstString(output, ["ODNO"]),
+      orderTime: firstString(output, ["ORD_TMD"]),
+      trId,
+      market: exchangeCode,
+      ticker,
+      side: input.side,
+      orderType: input.orderType,
+      quantity,
+      orderPrice,
+      currency: input.currency.toUpperCase(),
+      rawData: result.body
     };
   }
 

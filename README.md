@@ -240,7 +240,18 @@ KIS 서버 route는 기본값에서 `localhost`, `127.0.0.1`, `::1` 요청만 �
 
 해외주식 잔고는 계좌 권한과 거래소 파라미터가 맞아야 하므로 기본값에서는 꺼져 있습니다. 필요하면 `KIS_SYNC_OVERSEAS="true"`, `KIS_OVERSEAS_EXCHANGES="NASD"`, `KIS_OVERSEAS_CURRENCIES="USD"`를 설정합니다. KIS 해외 잔고 응답에 환율이 없으면 `KIS_DEFAULT_USD_KRW_RATE`를 설정하거나 동기화 미리보기에서 환율 경고를 확인해야 합니다.
 
-현재 KIS 구현은 잔고/예수금 조회 전용입니다. 주문, 정정, 취소 API는 연결하지 않았습니다. 실제 주문 기능을 붙이기 전에는 사용자별 권한 검증, 주문 확인 기록, 주문 감사 로그, 중지 스위치 동작을 먼저 확정해야 합니다.
+KIS 주문 API는 수동 실거래 주문 제안에서만 사용할 수 있으며 기본값에서는 꺼져 있습니다. 주문은 지정가만 허용하고, 자동매매/자동 리밸런싱에서 직접 호출하지 않습니다. 사용하려면 `.env.local`에 아래 값을 명시하고 dev server를 재시작합니다.
+
+```bash
+KIS_ENABLE_ORDER_API="true"
+KIS_ORDER_CONFIRMATION_TEXT="KIS_REAL_ORDER_EXECUTE"
+KIS_DOMESTIC_ORDER_EXCHANGE="KRX"
+KIS_ORDER_USD_KRW_RATE="1350"
+```
+
+`KIS_ENV="real"`에서 실제 주문을 보내려면 `KIS_ENABLE_REAL_ORDER_API="true"`도 필요합니다. 매도 주문은 추가로 `KIS_ENABLE_SELL_ORDER_API="true"`를 설정해야 합니다. `/trading` 화면에서 실거래 주문 제안을 만든 뒤 주문 제안을 확인하고, 최종 확인 입력에 `KIS_REAL_ORDER_EXECUTE`를 입력해야 서버 route가 KIS 주문 API를 호출합니다.
+
+현재 KIS 주문 구현은 국내주식 현금 지정가 매수/매도와 해외주식 지정가 매수/매도를 지원합니다. 정정/취소, 체결 조회 기반 상태 갱신, 미체결 주문 관리, 사용자별 서버 인증은 아직 별도 후속 작업입니다.
 
 ## 이메일 mock
 

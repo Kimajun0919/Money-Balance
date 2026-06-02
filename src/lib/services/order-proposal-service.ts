@@ -73,6 +73,12 @@ function buildProposal(
   );
   const riskCheckMessages = [...riskCheck.messages, ...gateMessages];
   const status = riskCheckMessages.length > 0 ? "blocked" : "proposed";
+  const orderType = params.executionMode === "live" ? "limit" : "market";
+  const limitPrice = orderType === "limit" ? instrument.lastPrice : undefined;
+  const quantity =
+    instrument.currency === "KRW" && instrument.lastPrice > 0
+      ? Math.floor(amountKrw / instrument.lastPrice)
+      : undefined;
 
   return {
     id: createId("order"),
@@ -81,9 +87,11 @@ function buildProposal(
     ticker: instrument.ticker,
     instrumentName: instrument.instrumentName,
     side,
-    orderType: "market",
+    orderType,
     executionMode: params.executionMode,
     amountKrw,
+    quantity,
+    limitPrice,
     currency: instrument.currency,
     estimatedPrice: instrument.lastPrice,
     estimatedFeesKrw: Math.round(amountKrw * 0.001),
@@ -210,7 +218,11 @@ export function confirmOrderProposal(
 
 export function submitOrderProposal(
   state: AppState,
-  proposalId: string
+  proposalId: string,
+  options: {
+    brokerOrderResult?: Record<string, unknown>;
+    message?: string;
+  } = {}
 ): AppState {
   const now = new Date().toISOString();
   const proposal = state.orderProposals.find((item) => item.id === proposalId);
@@ -279,7 +291,7 @@ export function submitOrderProposal(
     appendOrderEventLog(nextState, {
       eventType,
       executionMode: proposal.executionMode,
-      message: "주문을 제출했습니다.",
+      message: options.message ?? "주문을 제출했습니다.",
       status: "success",
       orderProposalId: proposal.id,
       instrumentId: proposal.instrumentId,
@@ -295,7 +307,8 @@ export function submitOrderProposal(
       metadata: {
         ticker: proposal.ticker,
         amountKrw: proposal.amountKrw,
-        executionMode: proposal.executionMode
+        executionMode: proposal.executionMode,
+        brokerOrderResult: options.brokerOrderResult
       },
       createdAt: now
     }

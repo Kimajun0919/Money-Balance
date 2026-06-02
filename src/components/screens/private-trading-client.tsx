@@ -38,8 +38,11 @@ import { addRecommendationToWatchlist } from "@/lib/services/watchlist-service";
 import { ASSET_TYPE_SETTINGS } from "@/lib/constants/asset-types";
 import type {
   InstrumentRecommendation,
+  OrderProposal,
   TradingExecutionMode
 } from "@/lib/types";
+import type { KisOrderResult } from "@/lib/providers/broker/kis-broker-provider";
+import { KIS_BROKER_PROVIDER_NAME } from "@/lib/providers/broker/broker-provider-constants";
 import { formatKrw } from "@/lib/utils/currency";
 import { formatPercent } from "@/lib/utils/percentage";
 
@@ -65,12 +68,32 @@ const proposalStatusLabels = {
   canceled: "취소"
 };
 
+async function readApiJson<T>(response: Response): Promise<T> {
+  const payload = (await response.json().catch(() => ({}))) as {
+    error?: string;
+  };
+  if (!response.ok) {
+    throw new Error(payload.error ?? "API 요청에 실패했습니다.");
+  }
+  return payload as T;
+}
+
 export function PrivateTradingClient() {
   const { state, updateState } = useAppState();
   const [message, setMessage] = useState("");
+  const [kisOrderConfirmationText, setKisOrderConfirmationText] = useState("");
   const latestRecommendations = useMemo(
     () => state.recommendations.slice(0, 10),
     [state.recommendations]
+  );
+  const hasConnectedKisBroker = useMemo(
+    () =>
+      state.externalConnections.some(
+        (connection) =>
+          connection.status === "connected" &&
+          connection.providerName === KIS_BROKER_PROVIDER_NAME
+      ),
+    [state.externalConnections]
   );
 
   function update(nextState: typeof state, nextMessage: string) {
@@ -140,7 +163,58 @@ export function PrivateTradingClient() {
     update(confirmOrderProposal(state, proposalId), "주문 제안을 확인했습니다.");
   }
 
-  function submitProposal(proposalId: string) {
+  function toKisOrderRequest(proposal: OrderProposal) {
+    const instrument = state.productUniverse.find(
+      (item) => item.id === proposal.instrumentId
+    );
+
+    return {
+      proposalId: proposal.id,
+      ticker: proposal.ticker,
+      market: instrument?.market,
+      currency: proposal.currency,
+      side: proposal.side,
+      orderType: proposal.orderType,
+      amountKrw: proposal.amountKrw,
+      quantity: proposal.quantity,
+      limitPrice: proposal.limitPrice,
+      estimatedPrice: proposal.estimatedPrice,
+      userConfirmedOrder: proposal.userConfirmedOrder,
+      confirmationText: kisOrderConfirmationText.trim()
+    };
+  }
+
+  async function submitProposal(proposalId: string) {
+    const proposal = state.orderProposals.find((item) => item.id === proposalId);
+    if (!proposal) return;
+
+    if (proposal.executionMode === "live" && hasConnectedKisBroker) {
+      try {
+        const payload = await readApiJson<{ orderResult: KisOrderResult }>(
+          await fetch("/api/broker/kis/order", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ order: toKisOrderRequest(proposal) })
+          })
+        );
+        update(
+          submitOrderProposal(state, proposalId, {
+            brokerOrderResult: payload.orderResult as unknown as Record<
+              string,
+              unknown
+            >,
+            message: "KIS 실주문을 제출했습니다."
+          }),
+          `KIS 실주문 제출 완료: ${payload.orderResult.orderId ?? "주문번호 미제공"}`
+        );
+      } catch (error) {
+        setMessage(
+          error instanceof Error ? error.message : "KIS 실주문 제출에 실패했습니다."
+        );
+      }
+      return;
+    }
+
     update(submitOrderProposal(state, proposalId), "주문 제출 처리를 기록했습니다.");
   }
 
@@ -450,6 +524,26 @@ export function PrivateTradingClient() {
 
       <section className="rounded-md border border-line bg-white p-5 shadow-panel">
         <h2 className="text-lg font-bold text-ink">주문 제안</h2>
+        {hasConnectedKisBroker ? (
+          <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-4">
+            <label className="block text-sm font-semibold text-amber-950">
+              KIS 실주문 최종 확인
+              <input
+                value={kisOrderConfirmationText}
+                onChange={(event) =>
+                  setKisOrderConfirmationText(event.target.value)
+                }
+                className="mt-2 h-10 w-full rounded-md border border-amber-300 bg-white px-3 text-neutral-900"
+                placeholder="KIS_REAL_ORDER_EXECUTE"
+              />
+            </label>
+            <p className="mt-2 text-sm leading-6 text-amber-900">
+              연결된 한국투자증권 계좌가 있으면 실거래 제출 버튼은 서버 KIS
+              주문 route를 호출합니다. 지정가 주문만 허용되며 매도는 별도
+              환경변수로 열어야 합니다.
+            </p>
+          </div>
+        ) : null}
         <div className="table-scroll mt-4 overflow-x-auto">
           <table className="w-full min-w-[940px] text-sm">
             <thead>
@@ -498,7 +592,13 @@ export function PrivateTradingClient() {
                       <button
                         type="button"
                         onClick={() => submitProposal(proposal.id)}
-                        className="rounded-md border border-line px-2 py-1 text-xs font-semibold text-neutral-700"
+                        disabled={
+                          proposal.status === "blocked" ||
+                          (proposal.executionMode === "live" &&
+                            hasConnectedKisBroker &&
+                            !kisOrderConfirmationText.trim())
+                        }
+                        className="rounded-md border border-line px-2 py-1 text-xs font-semibold text-neutral-700 disabled:text-neutral-300"
                       >
                         제출
                       </button>
