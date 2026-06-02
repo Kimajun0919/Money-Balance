@@ -7,11 +7,24 @@ import { DisclaimerNote } from "@/components/common/disclaimer-note";
 import { useAppState } from "@/hooks/use-app-state";
 import {
   applyBrokerSyncPreview,
+  createBrokerSyncPreviewFromResult,
   createBrokerSyncPreview,
   type BrokerSyncPreview
 } from "@/lib/services/broker-sync-service";
+import type { BrokerSyncResult } from "@/lib/providers/broker/broker-provider";
+import { KIS_BROKER_PROVIDER_NAME } from "@/lib/providers/broker/broker-provider-constants";
 import { ASSET_TYPE_SETTINGS } from "@/lib/constants/asset-types";
 import { formatKrw } from "@/lib/utils/currency";
+
+async function readApiJson<T>(response: Response): Promise<T> {
+  const payload = (await response.json().catch(() => ({}))) as {
+    error?: string;
+  };
+  if (!response.ok) {
+    throw new Error(payload.error ?? "API 요청에 실패했습니다.");
+  }
+  return payload as T;
+}
 
 export function BrokerSyncClient() {
   const { state, updateState } = useAppState();
@@ -34,7 +47,32 @@ export function BrokerSyncClient() {
   async function sync() {
     if (!selectedConnectionId) return;
     try {
-      const result = await createBrokerSyncPreview(state, selectedConnectionId);
+      const selectedConnection = connected.find(
+        (connection) => connection.id === selectedConnectionId
+      );
+      const result =
+        selectedConnection?.providerName === KIS_BROKER_PROVIDER_NAME
+          ? createBrokerSyncPreviewFromResult(
+              state,
+              selectedConnectionId,
+              (
+                await readApiJson<{ syncResult: BrokerSyncResult }>(
+                  await fetch("/api/broker/kis/sync", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      connectionId: selectedConnectionId,
+                      accountAlias: selectedConnection.accountAlias
+                    })
+                  })
+                )
+              ).syncResult,
+              {
+                providerName: selectedConnection.providerName,
+                brokerName: selectedConnection.brokerName
+              }
+            )
+          : await createBrokerSyncPreview(state, selectedConnectionId);
       updateState(result.state);
       setPreview(result.preview);
       setMessage("증권사 잔고 동기화 미리보기를 생성했습니다.");
@@ -88,9 +126,15 @@ export function BrokerSyncClient() {
               onChange={(event) => setConnectionId(event.target.value)}
               className="mt-2 h-11 w-full rounded-md border border-line px-3"
             >
+              {connected.length === 0 ? (
+                <option value="">연결된 계좌 없음</option>
+              ) : null}
               {connected.map((connection) => (
                 <option key={connection.id} value={connection.id}>
                   {connection.brokerName} · {connection.accountAlias}
+                  {connection.providerName === KIS_BROKER_PROVIDER_NAME
+                    ? " · 실 API"
+                    : ""}
                 </option>
               ))}
             </select>
@@ -108,6 +152,14 @@ export function BrokerSyncClient() {
         {connected.length === 0 ? (
           <p className="mt-3 text-sm text-neutral-500">
             먼저 읽기 전용 증권사 연결을 생성해야 합니다.
+          </p>
+        ) : null}
+        {connected.some(
+          (connection) => connection.providerName === KIS_BROKER_PROVIDER_NAME
+        ) ? (
+          <p className="mt-3 text-sm text-amber-800">
+            한국투자증권 동기화는 서버 환경변수의 실계좌 정보를 사용해 잔고만
+            조회합니다. 주문 API는 호출하지 않습니다.
           </p>
         ) : null}
         {message ? <p className="mt-3 text-sm text-neutral-600">{message}</p> : null}

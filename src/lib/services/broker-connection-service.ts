@@ -1,5 +1,8 @@
 import { MockBrokerProvider } from "@/lib/providers/broker/mock-broker-provider";
-import type { BrokerProvider } from "@/lib/providers/broker/broker-provider";
+import type {
+  BrokerConnectionResult,
+  BrokerProvider
+} from "@/lib/providers/broker/broker-provider";
 import { logKpiEvent } from "@/lib/kpi/event-logger";
 import type { AppState, ExternalConnection } from "@/lib/types";
 import { createId } from "@/lib/services/service-utils";
@@ -72,6 +75,52 @@ export async function connectBroker(
 
   logKpiEvent("broker_connection_completed", {
     provider: provider.providerName,
+    connectionId: connection.id
+  });
+
+  return {
+    state: {
+      ...state,
+      externalConnections: [connection, ...state.externalConnections]
+    },
+    connection: toBrokerConnectionPublicView(connection)
+  };
+}
+
+export function connectServerManagedBroker(
+  state: AppState,
+  params: {
+    accountAlias?: string;
+    consentAccepted: boolean;
+    connectionResult: BrokerConnectionResult;
+  }
+): { state: AppState; connection: BrokerConnectionPublicView } {
+  if (!params.consentAccepted) {
+    throw new Error("읽기 전용 연동 동의가 필요합니다.");
+  }
+
+  logKpiEvent("broker_connection_started", {
+    provider: params.connectionResult.providerName
+  });
+
+  const now = new Date().toISOString();
+  const connection: ExternalConnection = {
+    id: createId("conn"),
+    providerType: "broker",
+    providerName: params.connectionResult.providerName,
+    brokerName: params.connectionResult.brokerName,
+    accountAlias: params.accountAlias,
+    accountIdentifierMasked: params.connectionResult.accountIdentifierMasked,
+    tokenPreview: "server-managed",
+    scopes: params.connectionResult.scopes,
+    status: "connected",
+    consentAcceptedAt: params.connectionResult.connectedAt,
+    createdAt: now,
+    updatedAt: now
+  };
+
+  logKpiEvent("broker_connection_completed", {
+    provider: params.connectionResult.providerName,
     connectionId: connection.id
   });
 

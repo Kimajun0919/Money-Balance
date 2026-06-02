@@ -58,17 +58,44 @@ export async function createBrokerSyncPreview(
   });
   const startedAt = new Date().toISOString();
   const syncResult = await provider.sync(connectionId);
+  return createBrokerSyncPreviewFromResult(state, connectionId, syncResult, {
+    startedAt,
+    providerName: provider.providerName,
+    brokerName: provider.brokerName
+  });
+}
+
+export function createBrokerSyncPreviewFromResult(
+  state: AppState,
+  connectionId: string,
+  syncResult: Awaited<ReturnType<BrokerProvider["sync"]>>,
+  options: {
+    startedAt?: string;
+    providerName?: string;
+    brokerName?: string;
+  } = {}
+): { state: AppState; preview: BrokerSyncPreview } {
+  const connection = state.externalConnections.find(
+    (item) => item.id === connectionId && item.status === "connected"
+  );
+  if (!connection) {
+    throw new Error("연결된 증권사 정보를 찾을 수 없습니다.");
+  }
+
+  const startedAt = options.startedAt ?? new Date().toISOString();
   const rows = [
     ...syncResult.holdings.map((holding) =>
       normalizeBrokerHolding(holding, {
-        brokerName: connection.brokerName ?? provider.brokerName,
+        brokerName:
+          connection.brokerName ?? options.brokerName ?? "증권사",
         externalConnectionId: connectionId,
         syncedAt: syncResult.fetchedAt
       })
     ),
     ...syncResult.cashBalances.map((cashBalance) =>
       normalizeBrokerCashBalance(cashBalance, {
-        brokerName: connection.brokerName ?? provider.brokerName,
+        brokerName:
+          connection.brokerName ?? options.brokerName ?? "증권사",
         externalConnectionId: connectionId,
         syncedAt: syncResult.fetchedAt
       })
@@ -84,7 +111,7 @@ export async function createBrokerSyncPreview(
     id: createId("synclog"),
     connectionId,
     providerType: "broker",
-    providerName: connection.providerName,
+    providerName: connection.providerName ?? options.providerName ?? "broker",
     syncType: "broker_holdings",
     status: "previewed",
     startedAt,

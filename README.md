@@ -57,7 +57,7 @@ npm test
 - 수량, 현재가, 환율 기반 평가금액 갱신
 - 데이터 신선도 경고
 - 자산군 자동 분류 제안
-- 증권사 읽기 전용 모의 연결, 토큰 암호화, 동기화 미리보기와 반영
+- 증권사 읽기 전용 모의 연결, 한국투자증권 KIS 잔고 조회, 동기화 미리보기와 반영
 - 개인용 안전 게이트, 종목 추천, 관심목록, 주문 제안, 모의/샌드박스/실거래 구조, 자동매매 규칙, 중지 스위치, 거래 감사 로그
 - 리밸런싱 드리프트 계산, 현금 우선 계획 생성, 매도 보호, 모의/샌드박스/실거래 리밸런싱 구조, 자동 규칙, 스케줄러 no-op, 리밸런싱 감사 로그
 
@@ -88,7 +88,7 @@ npm test
 - `/import/csv`: 표준 CSV 템플릿 다운로드, 검증, 가져오기, 가져오기 이력
 - `/import/assets`: Phase 3 자산 가져오기 화면
 - `/import/history`: 가져오기 작업 이력과 연결 스냅샷 확인
-- `/connections/broker`: 읽기 전용 모의 증권사 연결, 연동 해제, 동기화 데이터 삭제
+- `/connections/broker`: 읽기 전용 모의 증권사/한국투자증권 KIS 연결, 연동 해제, 동기화 데이터 삭제
 - `/connections/broker/sync`: 증권사 잔고 동기화 미리보기와 사용자 확인 후 반영
 - `/connections/logs`: 외부 데이터 연동 로그 확인
 - `/trading`: 개인용 추천, 상품 유니버스, 관심목록, 주문 제안, 자동매매 규칙, 중지 스위치
@@ -118,15 +118,15 @@ Phase 3은 외부 데이터를 기존 계산 엔진 앞단에서 정규화한 �
 
 - `providers/market-data`: 시세 공급자 인터페이스, 모의 시세 공급자, 실제 공급자 교체용 비활성 어댑터
 - `providers/fx-rate`: 환율 공급자 인터페이스, 모의 환율 공급자, 실제 공급자 교체용 비활성 어댑터
-- `providers/broker`: 읽기 전용 증권사 공급자 인터페이스, 모의 증권사 공급자, 실제 공급자 교체용 비활성 어댑터
+- `providers/broker`: 읽기 전용 증권사 공급자 인터페이스, 모의 증권사 공급자, 한국투자증권 KIS 잔고 조회 어댑터
 - `market-data-service.ts`: 종목코드와 수량이 있는 자산의 현재가, 과거가격, 가격 변화율 갱신
 - `fx-rate-service.ts`: 외화 자산의 환율 갱신과 원화 환산 금액 업데이트
 - `valuation-service.ts`: 수량 × 현재가 × 환율 기반 평가금액 갱신, 수동 평가금액 보존
 - `data-freshness-service.ts`: 시세/환율 24시간, 증권사 잔고 7일 기준 경고 생성
 - `asset-classification-service.ts`: 이름, 티커, 상품 유형 기반 자산군 제안과 신뢰도 산출
 - `asset-normalization-service.ts`: 증권사 잔고와 현금 데이터를 내부 자산 입력 형식으로 변환
-- `broker-connection-service.ts`: 읽기 전용 연결 동의, 토큰 암호화 저장, 연동 해제, 동기화 데이터 삭제
-- `broker-sync-service.ts`: 동기화 미리보기, 중복 감지, 사용자 확인 후 반영, 스냅샷 생성
+- `broker-connection-service.ts`: 읽기 전용 연결 동의, 모의 토큰 암호화 저장, 서버관리형 KIS 연결 저장, 연동 해제, 동기화 데이터 삭제
+- `broker-sync-service.ts`: 모의/KIS 동기화 미리보기, 중복 감지, 사용자 확인 후 반영, 스냅샷 생성
 - `token-encryption-service.ts`: 브라우저 Web Crypto 기반 AES-GCM 토큰 암호화
 
 ## Phase 4 서비스 계층
@@ -224,7 +224,23 @@ Phase 5 기준 모델:
 cp .env.example .env
 ```
 
-실제 시세, 환율, 증권사 API를 붙이기 전에는 서버 측 토큰 암호화 키, 사용자별 권한 검증, 사용자 확인 기록, 주문 감사 로그, 중지 스위치 동작을 먼저 확정해야 합니다.
+한국투자증권 KIS 읽기 전용 잔고 조회를 사용하려면 `.env.local`에 아래 값을 설정합니다. 키는 브라우저에 입력하지 않고 서버 route에서만 사용합니다.
+
+```bash
+KIS_ENV="real"
+KIS_APP_KEY="..."
+KIS_APP_SECRET="..."
+KIS_ACCOUNT_NUMBER="12345678"
+KIS_ACCOUNT_PRODUCT_CODE="01"
+KIS_ACCOUNT_ALIAS="한국투자 종합계좌"
+KIS_ALLOW_NON_LOCAL_SERVER_ROUTES="false"
+```
+
+KIS 서버 route는 기본값에서 `localhost`, `127.0.0.1`, `::1` 요청만 허용합니다. 공개 배포에서 이 route를 열면 서버 환경변수의 실계좌 잔고가 API 응답으로 노출될 수 있으므로, 사용자 인증과 권한 분리를 붙이기 전에는 `KIS_ALLOW_NON_LOCAL_SERVER_ROUTES`를 켜지 않습니다.
+
+해외주식 잔고는 계좌 권한과 거래소 파라미터가 맞아야 하므로 기본값에서는 꺼져 있습니다. 필요하면 `KIS_SYNC_OVERSEAS="true"`, `KIS_OVERSEAS_EXCHANGES="NASD"`, `KIS_OVERSEAS_CURRENCIES="USD"`를 설정합니다. KIS 해외 잔고 응답에 환율이 없으면 `KIS_DEFAULT_USD_KRW_RATE`를 설정하거나 동기화 미리보기에서 환율 경고를 확인해야 합니다.
+
+현재 KIS 구현은 잔고/예수금 조회 전용입니다. 주문, 정정, 취소 API는 연결하지 않았습니다. 실제 주문 기능을 붙이기 전에는 사용자별 권한 검증, 주문 확인 기록, 주문 감사 로그, 중지 스위치 동작을 먼저 확정해야 합니다.
 
 ## 이메일 mock
 
