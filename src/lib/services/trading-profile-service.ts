@@ -170,6 +170,8 @@ export function activateKillSwitch(state: AppState): AppState {
       killSwitchActive: true,
       liveTradingEnabled: false,
       autoTradingEnabled: false,
+      liveRebalancingEnabled: false,
+      autoRebalancingEnabled: false,
       updatedAt: now
     },
     autoTradingRules: state.autoTradingRules.map((rule) => ({

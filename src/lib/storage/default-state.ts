@@ -7,6 +7,8 @@ import type {
   PrivateTradingFlags,
   PrivateTradingRiskLimits,
   ProductUniverseItem,
+  RebalancingPolicy,
+  RebalancingRule,
   UserNotificationSettings,
   UserProfile
 } from "@/lib/types";
@@ -54,13 +56,21 @@ export function createDefaultPrivateTradingFlags(): PrivateTradingFlags {
     brokerSandboxEnabled: true,
     liveTradingEnabled: false,
     autoTradingEnabled: false,
+    rebalancingEnabled: true,
+    autoRebalancingEnabled: false,
+    paperRebalancingEnabled: true,
+    sandboxRebalancingEnabled: true,
+    liveRebalancingEnabled: false,
     brokerOrderApiConfigured: false,
     brokerConnectionActive: false,
     userTradingConsentAccepted: false,
     userAutoTradingConsentAccepted: false,
+    userRebalancingConsentAccepted: false,
+    userAutoRebalancingConsentAccepted: false,
     riskProfileCompleted: false,
     principalLossAcknowledged: false,
     autoTradingRiskAcknowledged: false,
+    autoRebalancingRiskAcknowledged: false,
     killSwitchActive: false,
     updatedAt: now
   };
@@ -230,6 +240,80 @@ export function createDefaultProductUniverse(): ProductUniverseItem[] {
   ];
 }
 
+export function createDefaultRebalancingPolicy(): RebalancingPolicy {
+  const now = new Date().toISOString();
+
+  return {
+    id: "rebalancing_policy_default",
+    policyName: "기본 리밸런싱 정책",
+    enabled: true,
+    defaultMode: "analysis_only",
+    rebalanceType: "threshold",
+    driftThresholdPercent: 0.03,
+    assetClassThresholdPercent: 0.03,
+    instrumentThresholdPercent: 0.05,
+    minTradeAmount: 50_000,
+    maxTradeAmount: 1_000_000,
+    maxTotalRebalanceAmount: 3_000_000,
+    maxDailyRebalanceAmount: 3_000_000,
+    maxMonthlyRebalanceAmount: 10_000_000,
+    maxOrdersPerRebalance: 5,
+    maxOrdersPerDay: 5,
+    minCashRatioAfterRebalance: 0.05,
+    maxCashRatioAfterRebalance: 0.35,
+    allowBuyOrders: true,
+    allowSellOrders: false,
+    allowFractionalQuantity: true,
+    preferCashFirst: true,
+    preferLimitOrders: true,
+    avoidTaxableSales: true,
+    avoidHighVolatilityAssets: true,
+    cooldownHours: 24,
+    requireConfirmationForLiveOrders: true,
+    requireConfirmationForSellOrders: true,
+    requireConfirmationForLargeOrders: true,
+    largeOrderThresholdAmount: 1_000_000,
+    tradingMode: "analysis",
+    createdAt: now,
+    updatedAt: now
+  };
+}
+
+export function createDefaultRebalancingRule(
+  policyId = "rebalancing_policy_default"
+): RebalancingRule {
+  const now = new Date().toISOString();
+
+  return {
+    id: "rebalancing_rule_manual_check",
+    policyId,
+    ruleName: "수동 점검 규칙",
+    enabled: false,
+    ruleType: "manual_trigger",
+    scheduleTimezone: "Asia/Seoul",
+    driftThresholdPercent: 0.03,
+    assetClassThresholdPercent: 0.03,
+    instrumentThresholdPercent: 0.05,
+    cashTriggerAmount: 500_000,
+    contributionTriggerEnabled: true,
+    withdrawalTriggerEnabled: false,
+    targetAssetClasses: [],
+    excludedAssetClasses: [],
+    allowedInstrumentIds: [],
+    excludedInstrumentIds: [],
+    maxOrderAmount: 1_000_000,
+    maxTotalOrderAmount: 3_000_000,
+    maxOrdersPerRun: 5,
+    maxOrdersPerDay: 5,
+    minCashRatioAfterTrade: 0.05,
+    maxRiskScoreAfterTrade: 80,
+    cooldownHours: 24,
+    requireManualReview: true,
+    createdAt: now,
+    updatedAt: now
+  };
+}
+
 export function createSampleAssets(): Asset[] {
   const accountType = "general";
   const tax = getDefaultTaxRate(accountType, "covered_call");
@@ -330,6 +414,16 @@ export function createDefaultState(): AppState {
     orderEventLogs: [],
     tradingAuditLogs: [],
     tradingAcknowledgements: [],
-    autoTradingRules: []
+    autoTradingRules: [],
+    rebalancingPolicies: [createDefaultRebalancingPolicy()],
+    rebalancingRules: [createDefaultRebalancingRule()],
+    rebalancingSnapshots: [],
+    rebalancingPlans: [],
+    rebalancingPlanItems: [],
+    rebalancingExecutions: [],
+    rebalancingEvents: [],
+    rebalancingAuditLogs: [],
+    rebalancingSchedulerRuns: [],
+    rebalancingUserAcknowledgements: []
   };
 }

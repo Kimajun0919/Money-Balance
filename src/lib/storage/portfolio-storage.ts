@@ -75,7 +75,25 @@ function normalizeState(parsed: Partial<AppState>): AppState {
     tradingAuditLogs: parsed.tradingAuditLogs ?? defaults.tradingAuditLogs,
     tradingAcknowledgements:
       parsed.tradingAcknowledgements ?? defaults.tradingAcknowledgements,
-    autoTradingRules: parsed.autoTradingRules ?? defaults.autoTradingRules
+    autoTradingRules: parsed.autoTradingRules ?? defaults.autoTradingRules,
+    rebalancingPolicies:
+      parsed.rebalancingPolicies ?? defaults.rebalancingPolicies,
+    rebalancingRules: parsed.rebalancingRules ?? defaults.rebalancingRules,
+    rebalancingSnapshots:
+      parsed.rebalancingSnapshots ?? defaults.rebalancingSnapshots,
+    rebalancingPlans: parsed.rebalancingPlans ?? defaults.rebalancingPlans,
+    rebalancingPlanItems:
+      parsed.rebalancingPlanItems ?? defaults.rebalancingPlanItems,
+    rebalancingExecutions:
+      parsed.rebalancingExecutions ?? defaults.rebalancingExecutions,
+    rebalancingEvents: parsed.rebalancingEvents ?? defaults.rebalancingEvents,
+    rebalancingAuditLogs:
+      parsed.rebalancingAuditLogs ?? defaults.rebalancingAuditLogs,
+    rebalancingSchedulerRuns:
+      parsed.rebalancingSchedulerRuns ?? defaults.rebalancingSchedulerRuns,
+    rebalancingUserAcknowledgements:
+      parsed.rebalancingUserAcknowledgements ??
+      defaults.rebalancingUserAcknowledgements
   };
 }
 

@@ -262,6 +262,170 @@ enum AutoTradingStrategyType {
   watchlist_signal
 }
 
+enum RebalancingMode {
+  analysis_only
+  paper_rebalancing
+  sandbox_rebalancing
+  live_manual_rebalancing
+  live_auto_rebalancing
+}
+
+enum RebalancingType {
+  scheduled
+  threshold
+  cash_based
+  contribution
+  withdrawal
+  full_portfolio
+}
+
+enum RebalancingTradingMode {
+  analysis
+  paper
+  sandbox
+  live
+}
+
+enum RebalancingRuleType {
+  scheduled
+  threshold
+  cash_deposit
+  cash_ratio
+  portfolio_drift
+  risk_score
+  manual_trigger
+}
+
+enum RebalancingPlanStatus {
+  draft
+  generated
+  review_required
+  approved
+  rejected
+  blocked_by_safety_gate
+  blocked_by_risk
+  paper_executed
+  sandbox_executed
+  live_order_proposed
+  live_executed
+  partially_executed
+  failed
+  canceled
+}
+
+enum RebalancingPlanType {
+  scheduled
+  threshold
+  cash_based
+  contribution
+  withdrawal
+  full_portfolio
+  manual
+}
+
+enum RebalancingPlanItemSide {
+  buy
+  sell
+  hold
+}
+
+enum RebalancingPlanItemStatus {
+  proposed
+  blocked
+  requires_review
+  approved
+  converted_to_order_proposal
+  paper_executed
+  sandbox_executed
+  live_executed
+  failed
+  canceled
+}
+
+enum RebalancingExecutionMode {
+  paper
+  sandbox
+  live_manual
+  live_auto
+}
+
+enum RebalancingExecutionStatus {
+  pending
+  running
+  completed
+  partially_completed
+  failed
+  canceled
+  blocked
+}
+
+enum RebalancingEventType {
+  snapshot_created
+  drift_detected
+  no_rebalance_needed
+  plan_generated
+  plan_blocked
+  plan_approved
+  plan_rejected
+  order_proposal_created
+  paper_rebalance_started
+  paper_rebalance_completed
+  sandbox_rebalance_started
+  sandbox_rebalance_completed
+  live_rebalance_proposed
+  live_rebalance_started
+  live_rebalance_completed
+  auto_rebalance_triggered
+  auto_rebalance_blocked
+  kill_switch_blocked
+  risk_check_failed
+  execution_failed
+  execution_canceled
+}
+
+enum RebalancingAuditEventType {
+  rebalancing_snapshot_created
+  rebalancing_drift_detected
+  rebalancing_plan_generated
+  rebalancing_plan_viewed
+  rebalancing_plan_approved
+  rebalancing_plan_rejected
+  rebalancing_order_proposal_created
+  rebalancing_order_blocked
+  paper_rebalancing_executed
+  sandbox_rebalancing_executed
+  live_rebalancing_order_submitted
+  auto_rebalancing_rule_created
+  auto_rebalancing_rule_enabled
+  auto_rebalancing_rule_disabled
+  auto_rebalancing_triggered
+  auto_rebalancing_blocked
+  rebalancing_kill_switch_blocked
+}
+
+enum RebalancingSchedulerRunType {
+  scheduled
+  threshold_check
+  manual_check
+  cash_trigger_check
+}
+
+enum RebalancingSchedulerRunStatus {
+  started
+  completed
+  no_op
+  blocked
+  failed
+}
+
+enum RebalancingAcknowledgementType {
+  manual_rebalancing
+  auto_rebalancing
+  sell_order
+  large_order
+  live_rebalancing
+}
+
 model User {
   id                   String              @id @default(cuid())
   email                String              @unique
@@ -297,6 +461,16 @@ model User {
   trading_audit_logs   TradingAuditLog[]
   trading_acknowledgements TradingAcknowledgement[]
   auto_trading_rules   AutoTradingRule[]
+  rebalancing_policies RebalancingPolicy[]
+  rebalancing_rules    RebalancingRule[]
+  rebalancing_snapshots RebalancingSnapshot[]
+  rebalancing_plans    RebalancingPlan[]
+  rebalancing_plan_items RebalancingPlanItem[]
+  rebalancing_executions RebalancingExecution[]
+  rebalancing_events   RebalancingEvent[]
+  rebalancing_audit_logs RebalancingAuditLog[]
+  rebalancing_scheduler_runs RebalancingSchedulerRun[]
+  rebalancing_user_acknowledgements RebalancingUserAcknowledgement[]
 
   @@map("users")
 }
@@ -934,6 +1108,283 @@ model AutoTradingRule {
   @@index([user_id, status])
   @@index([instrument_id])
   @@map("auto_trading_rules")
+}
+
+model RebalancingPolicy {
+  id                                    String                 @id @default(cuid())
+  user_id                               String
+  user                                  User                   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  policy_name                           String
+  enabled                               Boolean                @default(true)
+  default_mode                          RebalancingMode        @default(analysis_only)
+  rebalance_type                        RebalancingType        @default(threshold)
+  target_allocation_id                  String?
+  drift_threshold_percent               Decimal                @db.Decimal(8, 6)
+  asset_class_threshold_percent         Decimal                @db.Decimal(8, 6)
+  instrument_threshold_percent          Decimal                @db.Decimal(8, 6)
+  min_trade_amount                      Decimal                @db.Decimal(18, 2)
+  max_trade_amount                      Decimal                @db.Decimal(18, 2)
+  max_total_rebalance_amount            Decimal                @db.Decimal(18, 2)
+  max_daily_rebalance_amount            Decimal                @db.Decimal(18, 2)
+  max_monthly_rebalance_amount          Decimal                @db.Decimal(18, 2)
+  max_orders_per_rebalance              Int
+  max_orders_per_day                    Int
+  min_cash_ratio_after_rebalance        Decimal                @db.Decimal(8, 6)
+  max_cash_ratio_after_rebalance        Decimal                @db.Decimal(8, 6)
+  allow_buy_orders                      Boolean                @default(true)
+  allow_sell_orders                     Boolean                @default(false)
+  allow_fractional_quantity             Boolean                @default(true)
+  prefer_cash_first                     Boolean                @default(true)
+  prefer_limit_orders                   Boolean                @default(true)
+  avoid_taxable_sales                   Boolean                @default(true)
+  avoid_high_volatility_assets          Boolean                @default(true)
+  cooldown_hours                        Int
+  require_confirmation_for_live_orders  Boolean                @default(true)
+  require_confirmation_for_sell_orders  Boolean                @default(true)
+  require_confirmation_for_large_orders Boolean                @default(true)
+  large_order_threshold_amount          Decimal                @db.Decimal(18, 2)
+  trading_mode                          RebalancingTradingMode @default(analysis)
+  created_at                            DateTime               @default(now())
+  updated_at                            DateTime               @updatedAt
+
+  @@index([user_id, enabled])
+  @@map("rebalancing_policies")
+}
+
+model RebalancingRule {
+  id                              String              @id @default(cuid())
+  user_id                         String
+  user                            User                @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  policy_id                       String
+  rule_name                       String
+  enabled                         Boolean             @default(false)
+  rule_type                       RebalancingRuleType
+  schedule_cron                   String?
+  schedule_timezone               String
+  drift_threshold_percent         Decimal             @db.Decimal(8, 6)
+  asset_class_threshold_percent   Decimal             @db.Decimal(8, 6)
+  instrument_threshold_percent    Decimal             @db.Decimal(8, 6)
+  cash_trigger_amount             Decimal             @db.Decimal(18, 2)
+  contribution_trigger_enabled    Boolean             @default(false)
+  withdrawal_trigger_enabled      Boolean             @default(false)
+  target_asset_classes            Json
+  excluded_asset_classes          Json
+  allowed_instrument_ids          Json
+  excluded_instrument_ids         Json
+  max_order_amount                Decimal             @db.Decimal(18, 2)
+  max_total_order_amount          Decimal             @db.Decimal(18, 2)
+  max_orders_per_run              Int
+  max_orders_per_day              Int
+  min_cash_ratio_after_trade      Decimal             @db.Decimal(8, 6)
+  max_risk_score_after_trade      Decimal             @db.Decimal(8, 2)
+  cooldown_hours                  Int
+  require_manual_review           Boolean             @default(true)
+  last_checked_at                 DateTime?
+  last_triggered_at               DateTime?
+  last_executed_at                DateTime?
+  created_at                      DateTime            @default(now())
+  updated_at                      DateTime            @updatedAt
+
+  @@index([user_id, enabled])
+  @@index([policy_id])
+  @@map("rebalancing_rules")
+}
+
+model RebalancingSnapshot {
+  id                         String   @id @default(cuid())
+  user_id                    String
+  user                       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  portfolio_snapshot_id      String?
+  target_allocation_id       String?
+  current_total_value        Decimal  @db.Decimal(18, 2)
+  current_cash_value         Decimal  @db.Decimal(18, 2)
+  current_cash_ratio         Decimal  @db.Decimal(8, 6)
+  target_cash_ratio          Decimal  @db.Decimal(8, 6)
+  current_allocation_json    Json
+  target_allocation_json     Json
+  drift_json                 Json
+  max_drift_asset_type       AssetType?
+  max_drift_percent          Decimal  @db.Decimal(8, 6)
+  risk_score_before          Decimal  @db.Decimal(8, 2)
+  created_at                 DateTime @default(now())
+
+  @@index([user_id, created_at])
+  @@map("rebalancing_snapshots")
+}
+
+model RebalancingPlan {
+  id                              String                  @id @default(cuid())
+  user_id                         String
+  user                            User                    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  policy_id                       String
+  rule_id                         String?
+  snapshot_id                     String
+  plan_name                       String
+  plan_type                       RebalancingPlanType
+  trading_mode                    RebalancingTradingMode
+  status                          RebalancingPlanStatus
+  current_total_value             Decimal                 @db.Decimal(18, 2)
+  estimated_total_trade_amount    Decimal                 @db.Decimal(18, 2)
+  estimated_fee_amount            Decimal                 @db.Decimal(18, 2)
+  estimated_cash_after            Decimal                 @db.Decimal(18, 2)
+  estimated_cash_ratio_after      Decimal                 @db.Decimal(8, 6)
+  risk_score_before               Decimal                 @db.Decimal(8, 2)
+  risk_score_after                Decimal                 @db.Decimal(8, 2)
+  drift_before_json               Json
+  drift_after_json                Json
+  summary                         String
+  explanation                     String
+  warnings_json                   Json
+  blocking_reasons_json           Json
+  private_trading_flags_snapshot  Json
+  created_at                      DateTime                @default(now())
+  updated_at                      DateTime                @updatedAt
+
+  @@index([user_id, status])
+  @@index([policy_id])
+  @@index([rule_id])
+  @@map("rebalancing_plans")
+}
+
+model RebalancingPlanItem {
+  id                       String                    @id @default(cuid())
+  user_id                  String
+  user                     User                      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  plan_id                  String
+  instrument_id            String?
+  asset_type               AssetType
+  side                     RebalancingPlanItemSide
+  reason                   String
+  current_weight           Decimal                   @db.Decimal(8, 6)
+  target_weight            Decimal                   @db.Decimal(8, 6)
+  drift_percent            Decimal                   @db.Decimal(8, 6)
+  proposed_amount          Decimal                   @db.Decimal(18, 2)
+  proposed_quantity        Decimal?                  @db.Decimal(18, 6)
+  estimated_price          Decimal                   @db.Decimal(18, 6)
+  estimated_fee            Decimal                   @db.Decimal(18, 2)
+  estimated_total_amount   Decimal                   @db.Decimal(18, 2)
+  order_type               TradingOrderType
+  priority                 Int
+  risk_warnings_json       Json
+  blocking_reasons_json    Json
+  status                   RebalancingPlanItemStatus
+  created_at               DateTime                  @default(now())
+  updated_at               DateTime                  @updatedAt
+
+  @@index([user_id, plan_id])
+  @@index([instrument_id])
+  @@map("rebalancing_plan_items")
+}
+
+model RebalancingExecution {
+  id                       String                       @id @default(cuid())
+  user_id                  String
+  user                     User                         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  plan_id                  String
+  execution_mode           RebalancingExecutionMode
+  status                   RebalancingExecutionStatus
+  started_at               DateTime?
+  completed_at             DateTime?
+  failed_at                DateTime?
+  failure_reason           String?
+  total_orders_attempted   Int
+  total_orders_successful  Int
+  total_orders_failed      Int
+  total_trade_amount       Decimal                      @db.Decimal(18, 2)
+  total_fee_amount         Decimal                      @db.Decimal(18, 2)
+  cash_before              Decimal                      @db.Decimal(18, 2)
+  cash_after               Decimal                      @db.Decimal(18, 2)
+  risk_score_before        Decimal                      @db.Decimal(8, 2)
+  risk_score_after         Decimal                      @db.Decimal(8, 2)
+  drift_before_json        Json
+  drift_after_json         Json
+  raw_result_json          Json
+  created_at               DateTime                     @default(now())
+  updated_at               DateTime                     @updatedAt
+
+  @@index([user_id, status])
+  @@index([plan_id])
+  @@map("rebalancing_executions")
+}
+
+model RebalancingEvent {
+  id             String                @id @default(cuid())
+  user_id        String
+  user           User                  @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  plan_id        String?
+  rule_id        String?
+  execution_id   String?
+  event_type     RebalancingEventType
+  status_before  String?
+  status_after   String?
+  message        String
+  raw_data       Json
+  created_at     DateTime              @default(now())
+
+  @@index([user_id, event_type])
+  @@index([plan_id])
+  @@index([rule_id])
+  @@map("rebalancing_events")
+}
+
+model RebalancingAuditLog {
+  id                              String                    @id @default(cuid())
+  user_id                         String
+  user                            User                      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  event_type                      RebalancingAuditEventType
+  entity_type                     String
+  entity_id                       String
+  input_json                      Json
+  output_json                     Json
+  private_trading_flags_snapshot  Json
+  risk_check_result               Json?
+  user_consent_snapshot           Json
+  ip_address                      String?
+  user_agent                      String?
+  created_at                      DateTime                  @default(now())
+
+  @@index([user_id, event_type])
+  @@index([entity_type, entity_id])
+  @@map("rebalancing_audit_logs")
+}
+
+model RebalancingSchedulerRun {
+  id                            String                         @id @default(cuid())
+  user_id                       String
+  user                          User                           @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  rule_id                       String
+  run_type                      RebalancingSchedulerRunType
+  status                        RebalancingSchedulerRunStatus
+  started_at                    DateTime
+  completed_at                  DateTime?
+  checked_portfolio_snapshot_id String?
+  drift_detected                Boolean
+  rebalancing_needed            Boolean
+  generated_plan_id             String?
+  execution_id                  String?
+  no_op_reason                  String?
+  failure_reason                String?
+  raw_result_json               Json
+  created_at                    DateTime                       @default(now())
+
+  @@index([user_id, status])
+  @@index([rule_id])
+  @@map("rebalancing_scheduler_runs")
+}
+
+model RebalancingUserAcknowledgement {
+  id                   String                         @id @default(cuid())
+  user_id              String
+  user                 User                           @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  acknowledgement_type RebalancingAcknowledgementType
+  accepted             Boolean
+  accepted_at          DateTime
+  ip_address           String?
+  user_agent           String?
+  created_at           DateTime                       @default(now())
+
+  @@index([user_id, acknowledgement_type])
+  @@map("rebalancing_user_acknowledgements")
 }
 
 model AssetTypeSetting {

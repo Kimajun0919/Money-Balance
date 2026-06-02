@@ -173,6 +173,126 @@ export type TradingAuditEventType =
   | "kill_switch_deactivated";
 export type AutoTradingRuleStatus = "disabled" | "enabled" | "blocked";
 export type AutoTradingStrategyType = "target_gap" | "watchlist_signal";
+export type RebalancingMode =
+  | "analysis_only"
+  | "paper_rebalancing"
+  | "sandbox_rebalancing"
+  | "live_manual_rebalancing"
+  | "live_auto_rebalancing";
+export type RebalancingType =
+  | "scheduled"
+  | "threshold"
+  | "cash_based"
+  | "contribution"
+  | "withdrawal"
+  | "full_portfolio";
+export type RebalancingTradingMode = "analysis" | "paper" | "sandbox" | "live";
+export type RebalancingRuleType =
+  | "scheduled"
+  | "threshold"
+  | "cash_deposit"
+  | "cash_ratio"
+  | "portfolio_drift"
+  | "risk_score"
+  | "manual_trigger";
+export type RebalancingPlanType = RebalancingType | "manual";
+export type RebalancingPlanStatus =
+  | "draft"
+  | "generated"
+  | "review_required"
+  | "approved"
+  | "rejected"
+  | "blocked_by_safety_gate"
+  | "blocked_by_risk"
+  | "paper_executed"
+  | "sandbox_executed"
+  | "live_order_proposed"
+  | "live_executed"
+  | "partially_executed"
+  | "failed"
+  | "canceled";
+export type RebalancingPlanItemSide = "buy" | "sell" | "hold";
+export type RebalancingPlanItemStatus =
+  | "proposed"
+  | "blocked"
+  | "requires_review"
+  | "approved"
+  | "converted_to_order_proposal"
+  | "paper_executed"
+  | "sandbox_executed"
+  | "live_executed"
+  | "failed"
+  | "canceled";
+export type RebalancingExecutionMode =
+  | "paper"
+  | "sandbox"
+  | "live_manual"
+  | "live_auto";
+export type RebalancingExecutionStatus =
+  | "pending"
+  | "running"
+  | "completed"
+  | "partially_completed"
+  | "failed"
+  | "canceled"
+  | "blocked";
+export type RebalancingEventType =
+  | "snapshot_created"
+  | "drift_detected"
+  | "no_rebalance_needed"
+  | "plan_generated"
+  | "plan_blocked"
+  | "plan_approved"
+  | "plan_rejected"
+  | "order_proposal_created"
+  | "paper_rebalance_started"
+  | "paper_rebalance_completed"
+  | "sandbox_rebalance_started"
+  | "sandbox_rebalance_completed"
+  | "live_rebalance_proposed"
+  | "live_rebalance_started"
+  | "live_rebalance_completed"
+  | "auto_rebalance_triggered"
+  | "auto_rebalance_blocked"
+  | "kill_switch_blocked"
+  | "risk_check_failed"
+  | "execution_failed"
+  | "execution_canceled";
+export type RebalancingAuditEventType =
+  | "rebalancing_snapshot_created"
+  | "rebalancing_drift_detected"
+  | "rebalancing_plan_generated"
+  | "rebalancing_plan_viewed"
+  | "rebalancing_plan_approved"
+  | "rebalancing_plan_rejected"
+  | "rebalancing_order_proposal_created"
+  | "rebalancing_order_blocked"
+  | "paper_rebalancing_executed"
+  | "sandbox_rebalancing_executed"
+  | "live_rebalancing_order_submitted"
+  | "auto_rebalancing_rule_created"
+  | "auto_rebalancing_rule_enabled"
+  | "auto_rebalancing_rule_disabled"
+  | "auto_rebalancing_triggered"
+  | "auto_rebalancing_blocked"
+  | "rebalancing_kill_switch_blocked";
+export type RebalancingSchedulerRunType =
+  | "scheduled"
+  | "threshold_check"
+  | "manual_check"
+  | "cash_trigger_check";
+export type RebalancingSchedulerRunStatus =
+  | "started"
+  | "completed"
+  | "no_op"
+  | "blocked"
+  | "failed";
+export type RebalancingAcknowledgementType =
+  | "manual_rebalancing"
+  | "auto_rebalancing"
+  | "sell_order"
+  | "large_order"
+  | "live_rebalancing";
 
 export interface PrivateTradingFlags {
   privateUseMode: boolean;
@@ -182,13 +302,21 @@ export interface PrivateTradingFlags {
   brokerSandboxEnabled: boolean;
   liveTradingEnabled: boolean;
   autoTradingEnabled: boolean;
+  rebalancingEnabled: boolean;
+  autoRebalancingEnabled: boolean;
+  paperRebalancingEnabled: boolean;
+  sandboxRebalancingEnabled: boolean;
+  liveRebalancingEnabled: boolean;
   brokerOrderApiConfigured: boolean;
   brokerConnectionActive: boolean;
   userTradingConsentAccepted: boolean;
   userAutoTradingConsentAccepted: boolean;
+  userRebalancingConsentAccepted: boolean;
+  userAutoRebalancingConsentAccepted: boolean;
   riskProfileCompleted: boolean;
   principalLossAcknowledged: boolean;
   autoTradingRiskAcknowledged: boolean;
+  autoRebalancingRiskAcknowledged: boolean;
   killSwitchActive: boolean;
   updatedAt: string;
 }
@@ -373,6 +501,268 @@ export interface AutoTradingRule {
   createdAt: string;
   updatedAt: string;
   lastTriggeredAt?: string;
+}
+
+export interface RebalancingPolicy {
+  id: string;
+  policyName: string;
+  enabled: boolean;
+  defaultMode: RebalancingMode;
+  rebalanceType: RebalancingType;
+  targetAllocationId?: string;
+  driftThresholdPercent: number;
+  assetClassThresholdPercent: number;
+  instrumentThresholdPercent: number;
+  minTradeAmount: number;
+  maxTradeAmount: number;
+  maxTotalRebalanceAmount: number;
+  maxDailyRebalanceAmount: number;
+  maxMonthlyRebalanceAmount: number;
+  maxOrdersPerRebalance: number;
+  maxOrdersPerDay: number;
+  minCashRatioAfterRebalance: number;
+  maxCashRatioAfterRebalance: number;
+  allowBuyOrders: boolean;
+  allowSellOrders: boolean;
+  allowFractionalQuantity: boolean;
+  preferCashFirst: boolean;
+  preferLimitOrders: boolean;
+  avoidTaxableSales: boolean;
+  avoidHighVolatilityAssets: boolean;
+  cooldownHours: number;
+  requireConfirmationForLiveOrders: boolean;
+  requireConfirmationForSellOrders: boolean;
+  requireConfirmationForLargeOrders: boolean;
+  largeOrderThresholdAmount: number;
+  tradingMode: RebalancingTradingMode;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RebalancingRule {
+  id: string;
+  policyId: string;
+  ruleName: string;
+  enabled: boolean;
+  ruleType: RebalancingRuleType;
+  scheduleCron?: string;
+  scheduleTimezone: string;
+  driftThresholdPercent: number;
+  assetClassThresholdPercent: number;
+  instrumentThresholdPercent: number;
+  cashTriggerAmount: number;
+  contributionTriggerEnabled: boolean;
+  withdrawalTriggerEnabled: boolean;
+  targetAssetClasses: AssetType[];
+  excludedAssetClasses: AssetType[];
+  allowedInstrumentIds: string[];
+  excludedInstrumentIds: string[];
+  maxOrderAmount: number;
+  maxTotalOrderAmount: number;
+  maxOrdersPerRun: number;
+  maxOrdersPerDay: number;
+  minCashRatioAfterTrade: number;
+  maxRiskScoreAfterTrade: number;
+  cooldownHours: number;
+  requireManualReview: boolean;
+  lastCheckedAt?: string;
+  lastTriggeredAt?: string;
+  lastExecutedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RebalancingDriftItem {
+  assetType: AssetType;
+  currentAmount: number;
+  currentWeight: number;
+  targetWeight: number;
+  driftPercent: number;
+  absoluteDriftPercent: number;
+  status: "underweight" | "overweight" | "within";
+}
+
+export interface InstrumentDriftItem {
+  instrumentId?: string;
+  ticker?: string;
+  instrumentName: string;
+  assetType: AssetType;
+  currentAmount: number;
+  currentWeight: number;
+  targetWeight: number;
+  driftPercent: number;
+  absoluteDriftPercent: number;
+}
+
+export interface RebalancingDriftResult {
+  currentAllocation: Record<string, number>;
+  targetAllocation: Record<string, number>;
+  driftByAssetClass: RebalancingDriftItem[];
+  driftByInstrument: InstrumentDriftItem[];
+  maxDriftAssetType?: AssetType;
+  maxDriftPercent: number;
+  underweightAssetTypes: AssetType[];
+  overweightAssetTypes: AssetType[];
+  rebalanceNeeded: boolean;
+  summary: string;
+}
+
+export interface RebalancingSnapshot {
+  id: string;
+  portfolioSnapshotId?: string;
+  targetAllocationId?: string;
+  currentTotalValue: number;
+  currentCashValue: number;
+  currentCashRatio: number;
+  targetCashRatio: number;
+  currentAllocationJson: Record<string, number>;
+  targetAllocationJson: Record<string, number>;
+  driftJson: RebalancingDriftItem[];
+  maxDriftAssetType?: AssetType;
+  maxDriftPercent: number;
+  riskScoreBefore: number;
+  createdAt: string;
+}
+
+export interface RebalancingPlanItem {
+  id: string;
+  planId: string;
+  instrumentId?: string;
+  assetType: AssetType;
+  side: RebalancingPlanItemSide;
+  reason: string;
+  currentWeight: number;
+  targetWeight: number;
+  driftPercent: number;
+  proposedAmount: number;
+  proposedQuantity?: number;
+  estimatedPrice: number;
+  estimatedFee: number;
+  estimatedTotalAmount: number;
+  orderType: TradingOrderType;
+  priority: number;
+  riskWarnings: string[];
+  blockingReasons: string[];
+  status: RebalancingPlanItemStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RebalancingPlan {
+  id: string;
+  policyId: string;
+  ruleId?: string;
+  snapshotId: string;
+  planName: string;
+  planType: RebalancingPlanType;
+  tradingMode: RebalancingTradingMode;
+  status: RebalancingPlanStatus;
+  currentTotalValue: number;
+  estimatedTotalTradeAmount: number;
+  estimatedFeeAmount: number;
+  estimatedCashAfter: number;
+  estimatedCashRatioAfter: number;
+  riskScoreBefore: number;
+  riskScoreAfter: number;
+  driftBeforeJson: RebalancingDriftItem[];
+  driftAfterJson: RebalancingDriftItem[];
+  summary: string;
+  explanation: string;
+  warnings: string[];
+  blockingReasons: string[];
+  privateTradingFlagsSnapshot: PrivateTradingFlags;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RebalancingRiskCheckResult {
+  allowed: boolean;
+  blockingReasons: string[];
+  warnings: string[];
+  postRebalanceRiskScore: number;
+  postRebalanceCashRatio: number;
+  postRebalanceAllocation: Record<string, number>;
+}
+
+export interface RebalancingExecution {
+  id: string;
+  planId: string;
+  executionMode: RebalancingExecutionMode;
+  status: RebalancingExecutionStatus;
+  startedAt?: string;
+  completedAt?: string;
+  failedAt?: string;
+  failureReason?: string;
+  totalOrdersAttempted: number;
+  totalOrdersSuccessful: number;
+  totalOrdersFailed: number;
+  totalTradeAmount: number;
+  totalFeeAmount: number;
+  cashBefore: number;
+  cashAfter: number;
+  riskScoreBefore: number;
+  riskScoreAfter: number;
+  driftBeforeJson: RebalancingDriftItem[];
+  driftAfterJson: RebalancingDriftItem[];
+  rawResultJson: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RebalancingEvent {
+  id: string;
+  planId?: string;
+  ruleId?: string;
+  executionId?: string;
+  eventType: RebalancingEventType;
+  statusBefore?: string;
+  statusAfter?: string;
+  message: string;
+  rawData: Record<string, unknown>;
+  createdAt: string;
+}
+
+export interface RebalancingAuditLog {
+  id: string;
+  eventType: RebalancingAuditEventType;
+  entityType: string;
+  entityId: string;
+  inputJson: Record<string, unknown>;
+  outputJson: Record<string, unknown>;
+  privateTradingFlagsSnapshot: PrivateTradingFlags;
+  riskCheckResult?: RebalancingRiskCheckResult;
+  userConsentSnapshot: Record<string, boolean>;
+  ipAddress?: string;
+  userAgent?: string;
+  createdAt: string;
+}
+
+export interface RebalancingSchedulerRun {
+  id: string;
+  ruleId: string;
+  runType: RebalancingSchedulerRunType;
+  status: RebalancingSchedulerRunStatus;
+  startedAt: string;
+  completedAt?: string;
+  checkedPortfolioSnapshotId?: string;
+  driftDetected: boolean;
+  rebalancingNeeded: boolean;
+  generatedPlanId?: string;
+  executionId?: string;
+  noOpReason?: string;
+  failureReason?: string;
+  rawResultJson: Record<string, unknown>;
+  createdAt: string;
+}
+
+export interface RebalancingUserAcknowledgement {
+  id: string;
+  acknowledgementType: RebalancingAcknowledgementType;
+  accepted: boolean;
+  acceptedAt: string;
+  ipAddress?: string;
+  userAgent?: string;
+  createdAt: string;
 }
 
 export interface UserProfile {
@@ -918,4 +1308,14 @@ export interface AppState {
   tradingAuditLogs: TradingAuditLog[];
   tradingAcknowledgements: TradingAcknowledgement[];
   autoTradingRules: AutoTradingRule[];
+  rebalancingPolicies: RebalancingPolicy[];
+  rebalancingRules: RebalancingRule[];
+  rebalancingSnapshots: RebalancingSnapshot[];
+  rebalancingPlans: RebalancingPlan[];
+  rebalancingPlanItems: RebalancingPlanItem[];
+  rebalancingExecutions: RebalancingExecution[];
+  rebalancingEvents: RebalancingEvent[];
+  rebalancingAuditLogs: RebalancingAuditLog[];
+  rebalancingSchedulerRuns: RebalancingSchedulerRun[];
+  rebalancingUserAcknowledgements: RebalancingUserAcknowledgement[];
 }
